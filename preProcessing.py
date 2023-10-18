@@ -164,11 +164,10 @@ class read_ALL():
         self.Calibration = self.Calibration.drop_duplicates(keep='first')
         # self.Calibration.reset_index(inplace=True,drop=True)
         self.Calibration.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
-        # print(self.Logs)
+
         self.files = self.files.join(self.Logs)
         # self.files['MetaDataFile']=self.files['MetaDataFile'].ffill()
         self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory'])
-        print(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory'])
         # self.write_Daily(self.Variable_Columns.copy(),self.ini['filenames']['variable_columns'])
         
     

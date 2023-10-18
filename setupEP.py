@@ -42,6 +42,7 @@ class makeRun():
         self.ini['Paths']['meta_dir'] = self.sub(self.ini['Paths']['metadata'])
 
         self.inventory = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+        self.inventory['MetaDataFile'] = self.inventory['MetaDataFile'].fillna('-')
         self.inventory = self.inventory.loc[self.inventory['MetaDataFile']!='-']
 
     def sub(self,val):
@@ -52,72 +53,68 @@ class makeRun():
             v = v.replace('DATE',str(self.dateStr))
         return(v)
     
-    def runDates(self,dateRange,name,threads = 2):
+    def runDates(self,dateRange,name,threads = 2,priority = 'normal'):
         runList = []
         Dates = (pd.date_range(dateRange[0],dateRange[1]))
+        
+        output_path = self.sub(self.ini['Paths']['eddypro_output']) 
+        if os.path.isdir(output_path):
+            shutil.rmtree(output_path)
+        os.makedirs(output_path)
+        batch_path = output_path+'EP_Runs/'
+        if os.path.isdir(batch_path):
+            shutil.rmtree(batch_path)
+        os.makedirs(batch_path)
         for runDate in Dates:
             self.dateStr = str(runDate.date())
             self.Year = runDate.year
+
+
             Metadata = self.inventory.loc[self.inventory.index.date==runDate.date(),'MetaDataFile'].unique()
             EddyProColumnUpdate = [f.replace('.metadata','.eddypro') for f in Metadata]
-            for md,epcu in zip(Metadata,EddyProColumnUpdate):
+            if len(Metadata)>1:
+                print('Wanning, Multiple MD for one day, implement fix')
+            for Metadata_File,epcu in zip(Metadata,EddyProColumnUpdate):
+                shutil.copy2(self.ini['Paths']['meta_dir']+Metadata_File,batch_path+Metadata_File)
+                file_name = batch_path+self.dateStr+'.eddypro'
                 self.epDataCols.read(self.ini['Paths']['meta_dir']+epcu)
                 for section in self.epDataCols.keys(): 
                     for key,value in self.epDataCols[section].items():
                         self.epRun[section][key]=value
-            for section in self.epUpdate.keys():
-                print(section)
-                for key,value in self.epUpdate[section].items():
-                    # print(key,eval(value))
-                    self.epRun[section][key]=eval(value)
+                for section in self.epUpdate.keys():
+                    for key,value in self.epUpdate[section].items():
+                        self.epRun[section][key]=eval(value)
+                with open(file_name, 'w') as eddypro:
+                    eddypro.write(';EDDYPRO_PROCESSING\n')
+                    self.epRun.write(eddypro,space_around_delimiters=False)
+                runList.append(file_name)    
 
-
-        #     self.column_numbers = pd.read_csv(self.sub(self.ini['Paths']['metadata']+self.ini['filenames']['variable_columns']),parse_dates={'timestamp':['date','time']},index_col=['timestamp'])
-
-        #     for section in self.epUpdate.keys():
-        #         for key,value in self.epUpdate[section].items():
-        #             if key != 'col_numbers':
-        #                 self.epRun[section][key]=eval(value)
-        #             else:
-        #                 columns=self.epUpdate[section][key].split(',')
-        #                 for col in columns:
-        #                     if col in self.column_numbers.columns:
-        #                         self.epRun[section][col]=str(self.column_numbers.loc[self.column_numbers.index.date==runDate.date(),col].values[0])
-        #                     else:
-        #                         self.epRun[section][col] = '0'
-
-            try:
-                os.mkdir(self.sub(self.ini['Paths']['eddypro_output']))
-            except:
-                pass
-            with open(self.epRun['Project']['file_name'], 'w') as eddypro:
-                eddypro.write(';EDDYPRO_PROCESSING\n')
-                self.epRun.write(eddypro,space_around_delimiters=False)
-            runList.append(self.epRun['Project']['file_name'])    
-
-        # if (__name__ == 'setupEP' or __name__ == '__main__') :
-        #     with Pool(processes=threads) as pool:
-        #         threads = multiprocessing.active_children()
+        if (__name__ == 'setupEP' or __name__ == '__main__') :
+            with Pool(processes=threads) as pool:
+                threads = multiprocessing.active_children()
                 
-        #         for thread in threads:
-        #             cwd = os.getcwd()
-        #             bin = cwd+f'/temp/{thread.pid}/bin/'
-        #             ini = cwd+f'/temp/{thread.pid}/ini/'
+                for thread in threads:
+                    cwd = os.getcwd()
+                    bin = cwd+f'/temp/{thread.pid}/bin/'
+                    ini = cwd+f'/temp/{thread.pid}/ini/'
 
-        #             shutil.copytree(self.ini['Paths']['eddypro_installation'],bin)
+                    shutil.copytree(self.ini['Paths']['eddypro_installation'],bin)
 
-        #             batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
-        #             with open(batchFile, 'w') as batch:
-        #                 contents = f'cd {bin}'
-        #                 contents+='\n'+self.ini['filenames']['eddypro_rp']
-        #                 contents+='\n'+self.ini['filenames']['eddypro_fcc']
-        #                 batch.write(contents)
-        #             os.mkdir(ini)
+                    batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
+                    with open(batchFile, 'w') as batch:
+                        contents = f'cd {bin}'
+                        P = priority.upper().replace(' ','')
+                        contents+=f'\nSTART /{P} '+self.ini['filenames']['eddypro_rp']
+                        contents+='\n'+f'WMIC process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{priority}"'
+                        contents+='\nSTART '+self.ini['filenames']['eddypro_fcc']
+                        contents+='\nEXIT'
+                        batch.write(contents)
+                    os.mkdir(ini)
 
-        #         pb = progressbar(len(runList),'Running EddyPro')
-        #         for i,_ in enumerate(pool.imap(runEP.Batch,runList)):
-        #             pb.step()
-        #         for thread in threads:
-        #             shutil.rmtree(os.getcwd()+f'/temp/{thread.pid}')
+                pb = progressbar(len(runList),'Running EddyPro')
+                for i,_ in enumerate(pool.imap(runEP.Batch,runList)):
+                    pb.step()
+                for thread in threads:
+                    shutil.rmtree(os.getcwd()+f'/temp/{thread.pid}')
 
-        #         pool.close()
+                pool.close()

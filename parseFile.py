@@ -118,8 +118,6 @@ class Parse():
         #     Flux = p_bar*(Data['w_prime']*Data[f'{key}_prime']).mean()
         #     print('Raw ',flux,' ',Flux)
 
-        # print(self.Variable_Names)
-
         if self.Template_File is False:
             self.Write_EP_Template(Data.columns)              
 
@@ -172,7 +170,6 @@ class Parse():
         for key,value in self.Vars['Project'].items():
             # for var in value.split(','):
             col_num = np.where(cols==key)[0]
-            print(key,col_num)
             if len(col_num) == 0:
                 channel = 0
             elif len(col_num)>1:
