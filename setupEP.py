@@ -2,15 +2,13 @@
 # Created by Dr. June Skeeter
 
 import os
-import sys
 import runEP
 import shutil
 import configparser
 import pandas as pd
-from subprocess import run
-from datetime import datetime
 import multiprocessing
 from multiprocessing import Pool
+from datetime import datetime
 
 import importlib
 importlib.reload(runEP)
@@ -21,7 +19,7 @@ class makeRun():
 
     def __init__(self,template_file,Site):
         
-        inis = ['configuration.ini']#,'EP_Dynamic_Updates.ini']
+        inis = ['configuration.ini']
         ini_file = ['ini_files/'+ini for ini in inis]
         self.ini = configparser.ConfigParser()
         self.ini.read(ini_file)
@@ -68,7 +66,6 @@ class makeRun():
         for runDate in Dates:
             self.dateStr = str(runDate.date())
             self.Year = runDate.year
-
 
             Metadata = self.inventory.loc[self.inventory.index.date==runDate.date(),'MetaDataFile'].unique()
             EddyProColumnUpdate = [f.replace('.metadata','.eddypro') for f in Metadata]

@@ -8,12 +8,16 @@ This project is still under development.
 
 This API is intended to streamline flux estimation using Eddy Pro.  The API allows you to run EddyPro in parallel batches to speed up processing.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI
 
+## Issues
+
+* Redundant metadata files
+* Time lag optimization
+* Cospectral analysis
 
 ## Workflow
 
 
 ### Preprocessing
-
 
 1. Read high frequency data in .ghg or .dat format.
 

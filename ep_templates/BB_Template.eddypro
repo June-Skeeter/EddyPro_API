@@ -1,8 +1,8 @@
 ;EDDYPRO_PROCESSING
 [Project]
 creation_date=2020-06-09T16:08:12
-last_change_date=2023-02-15T17:44:32
-file_name=C:/highfreq/BB/EP_templates/BB_template.eddypro
+last_change_date=2024-01-05T10:39:06
+file_name=C:/MM_Py/EddyPro_API/ep_templates/BB_Template.eddypro
 run_mode=0
 run_fcc=0
 project_title=processing
@@ -63,7 +63,7 @@ out_mean_cosp=1
 out_biomet=1
 bin_sp_avail=0
 full_sp_avail=0
-files_found=1789
+files_found=6312
 out_mean_spec=1
 hf_correct_ghg_ba=1
 hf_correct_ghg_zoh=1
@@ -177,7 +177,7 @@ flow_distortion=0
 rot_meth=1
 detrend_meth=0
 timeconst=250.0
-tlag_meth=2
+tlag_meth=4
 tap_win=3
 nbins=50
 avrg_len=30

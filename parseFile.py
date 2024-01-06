@@ -1,7 +1,7 @@
 # Code to facilitate pre-processing of GHG files for automated flux recalculations
 # Created by Dr. June Skeeter
+
 import os
-import re
 import sys
 from pathlib import Path
 import zipfile
@@ -10,13 +10,15 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from io import TextIOWrapper
-from datetime import datetime
 import xml.etree.ElementTree as ET
+import datetime
 import importlib
 
 import readLiConfigFiles as rLCF
 importlib.reload(rLCF)
 import eventLog as eL
+importlib.reload(eL)
+
 
 class Parse():
     def __init__(self,ini):
@@ -24,8 +26,11 @@ class Parse():
         self.Vars = configparser.ConfigParser()
         self.Vars.read_file(open(self.ini['templates']['VariableList']))
 
-        # self.Variable_Names = {}
-        # self.Variable_Positions = {}
+        if self.ini['templates']['UpdateMetadata'] != '':
+            self.UpdateMetadata = pd.read_csv('ini_files/BB_Metadata_Updates.csv',parse_dates={'Start':['TIMESTAMP_Start'],'End':['TIMESTAMP_End']})
+            self.UpdateMetadata['End']=self.UpdateMetadata['End'].fillna(pd.to_datetime(datetime.datetime.now()).ceil('H'))
+            self.UpdateMetadata.reset_index(inplace=True)
+            self.UpdateMetadata.set_index(['Start','End','index'],inplace=True)
 
         self.Metadata = configparser.ConfigParser()
         self.MetadataTemplate = configparser.ConfigParser()
@@ -40,9 +45,10 @@ class Parse():
         self.EV = eL.EventLog()
         self.getCal = rLCF.read_LI_Config(Log=self.EV)
 
-    def process_file(self,name,timestamp,Template_File=True,Testing=False):
+    def process_file(self,input,Template_File=True,Testing=False):
         self.Template_File = Template_File
-        self.TimeStamp = timestamp
+        name = input[0]
+        self.TimeStamp = input[1]
         self.fullFile = self.ini['Paths']['dpath']+"{:02d}".format(self.TimeStamp .month)+'/'+name
         _, self.file_type = name.rsplit('.',1)
         if self.file_type == 'ghg':
@@ -74,8 +80,14 @@ class Parse():
             self.readHeader(self.fullFile)
             self.read_dat(self.fullFile)
             self.EV.cleanLog(self.TimeStamp)
-            self.MetadataFile = os.path.basename(templateFiles[-1])
-        return(self)
+            self.Metadata_Filename = os.path.basename(templateFiles[-1])
+        return({'TimeStamp':self.TimeStamp,
+                'dataValues':self.dataValues,
+                'MetadataFile':self.Metadata_Filename,
+                'Update':self.EV.dfLog['Update'],
+                'Flag':self.EV.dfLog['Flag'],
+                'calData':self.getCal.calData,
+                'Updated':self.Template_File})
 
     def readHeader(self,file):
         self.Variable_Names = {}
@@ -111,8 +123,7 @@ class Parse():
                 Data['t_sonic'] = (Data[key]/331)**2*273
                 self.getStats(Data,'t_sonic','t_sonic')
         Data['w_prime']=Data['w']-Data['w'].mean()
-        p_bar=Data['col_air_p'].mean()
-        
+        # p_bar=Data['col_air_p'].mean()
         # for flux,key in self.Vars['Raw_Flux'].items():
         #     Data[f'{key}_prime'] = Data[key]-Data[key].mean()
         #     Flux = p_bar*(Data['w_prime']*Data[f'{key}_prime']).mean()
@@ -120,17 +131,32 @@ class Parse():
 
         if self.Template_File is False:
             self.Write_EP_Template(Data.columns)              
-
+              
     def Parse_Metadata(self,meta_file,MetadataTemplate_File):
         self.Metadata.read_file(meta_file)
-        templateFiles = [path for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*_{self.Metadata['Station']['logger_id']}.metadata")]
 
+        # Correct metadata if necessary
+        if self.ini['templates']['UpdateMetadata'] != '':
+            Start = self.UpdateMetadata.index.get_level_values('Start')
+            End = self.UpdateMetadata.index.get_level_values('End')
+            To_update = self.UpdateMetadata.loc[((Start<=self.TimeStamp)&(End>=self.TimeStamp))]
+            cid = ''
+            for ix,row in To_update.iterrows():
+                columns = row.dropna().index
+                values = row.dropna()
+                for col,cel in zip(columns,values):
+                    self.Metadata[col.split(' ')[0]][col.split(' ')[1]]=str(cel)
+        
+        templateList = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*_{self.Metadata['Station']['logger_id']}.metadata")]
+        templateList.sort()
+        templateFiles=[templateList[i] for i in range(len(templateList)) if os.path.basename(templateList[i]) < meta_file.name]
+        # print(templateFiles)
         if len(templateFiles)<1:
             MetadataTemplate_File = False
 
         if MetadataTemplate_File is True:
-            templateFiles.sort()
             self.MetadataTemplate.read_file(open(templateFiles[-1]))
+            
             for section,values in self.MetadataTemplate.items():
                 for key in values.keys():
                     if key in self.ini['Monitor']['dynamic_values'].split(','):
@@ -138,28 +164,27 @@ class Parse():
                     elif key in self.ini['Calculate'].keys():
                         self.dataValues[key] = eval(self.ini['Calculate'][key])
                     elif key in self.ini['Monitor']['orientation'].split(','):
+                        # Overwrite any values from the correction
                         if self.Metadata[section][key]!=self.MetadataTemplate[section][key]:
-                            print('Orientation Change!')
-                            print(section,key)
-                            print(self.Metadata[section][key],self.MetadataTemplate[section][key])
+                            self.EV.updateLog(f'Orientation {key}',self.Metadata[section][key],self.TimeStamp)
                             MetadataTemplate_File = False
                     elif key not in self.ini['Overwrite'].keys():
                         if self.Metadata[section][key]!=self.MetadataTemplate[section][key]:
-                            print('Issue!')
-                            print(section,key)
-                            print(self.Metadata[section][key],self.MetadataTemplate[section][key])
+                            self.EV.updateLog(f'Other {key}',self.Metadata[section][key],self.TimeStamp)
                             MetadataTemplate_File = False
 
-        if MetadataTemplate_File is False:         
+        if MetadataTemplate_File is False:    
+            # print(templateFiles)     
             self.MetadataTemplate.read_dict(self.Metadata)
             filename = f"{self.TimeStamp.strftime('%Y-%m-%dT%H%M%S')}_{self.Metadata['Station']['logger_id']}.metadata"
-            self.MetadataFile = filename
+            self.Metadata_Filename = filename
             with open(f"{self.ini['Paths']['meta_dir']}{filename}", 'w') as template:
                 template.write(';GHG_METADATA\n')
                 self.MetadataTemplate.write(template,space_around_delimiters=False)
         else:
-            self.MetadataFile = os.path.basename(templateFiles[-1])
+            self.Metadata_Filename = os.path.basename(templateFiles[-1])
         self.delimiter = self.ini['delimiter_key'][self.Metadata['FileDescription']['separator']].encode('ascii','ignore').decode('unicode_escape')
+
         return(MetadataTemplate_File)
 
     def Write_EP_Template(self,cols):
