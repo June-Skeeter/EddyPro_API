@@ -120,11 +120,15 @@ class Parse():
             else:
                 self.getStats(Data,key)
             if key == 'sos':
-                Data['t_sonic'] = (Data[key]/331)**2*273
-                self.getStats(Data,'t_sonic','t_sonic')
-        Data['w_prime']=Data['w']-Data['w'].mean()
+                #  Sonic Virtual Temp, eq 9 pg C-2: https://s.campbellsci.com/documents/ca/manuals/csat3_man.pdf
+                Data['t_sonic'] = (Data[key]**2/(1.4*287.04))
+                self.getStats(Data,'t_sonic')
+        print(self.TimeStamp)
+        print(self.dataValues['t_sonic'])
+        # Data['w_prime']=Data['w']-Data['w'].mean()
         # p_bar=Data['col_air_p'].mean()
-        # for flux,key in self.Vars['Raw_Flux'].items():
+        for key,val in self.Vars['Custom'].items():
+            self.dataValues[key]=eval(val)
         #     Data[f'{key}_prime'] = Data[key]-Data[key].mean()
         #     Flux = p_bar*(Data['w_prime']*Data[f'{key}_prime']).mean()
         #     print('Raw ',flux,' ',Flux)
@@ -178,6 +182,10 @@ class Parse():
             self.MetadataTemplate.read_dict(self.Metadata)
             filename = f"{self.TimeStamp.strftime('%Y-%m-%dT%H%M%S')}_{self.Metadata['Station']['logger_id']}.metadata"
             self.Metadata_Filename = filename
+            for section,values in self.MetadataTemplate.items():
+                for key in values.keys():
+                    if key in self.ini['Overwrite'].keys():
+                        self.MetadataTemplate[section][key] = self.ini['Overwrite'][key]
             with open(f"{self.ini['Paths']['meta_dir']}{filename}", 'w') as template:
                 template.write(';GHG_METADATA\n')
                 self.MetadataTemplate.write(template,space_around_delimiters=False)

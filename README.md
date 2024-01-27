@@ -19,12 +19,15 @@ This API is intended to streamline flux estimation using Eddy Pro.  The API allo
 
 ### Preprocessing
 
-1. Read high frequency data in .ghg or .dat format.
+1. Read high frequency data in .ghg or .data format.
 
-* If .ghg data are provided extract the data and read relevant sub-files
-* Calculate raw half-hourly means of all input data
-* Parse and track the metadata, inspecting for changes
-    * Update/correct metadata from a user-defined template as necessary
+* **If .ghg data** 
+    * Extract the data and read relevant sub-files
+    * Calculate raw half-hourly means of all input data
+    * Parse and track the metadata, inspecting for changes
+        * Update/correct metadata from a user-defined template as necessary
+
+* **If other .data files**
 
 2. Create metadata template files
 
