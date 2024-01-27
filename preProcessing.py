@@ -157,8 +157,6 @@ class read_ALL():
                 out = self.Parser.process_file([fn,ts],Testing=True)
                 self.appendRecs(out)
                 self.out = out
-            # self.dataRecords = out.dataRecords
-            # self.files['Flag'] = out.EV.dfLog['Flag']
 
 
         self.dataRecords = self.dataRecords.drop_duplicates(keep='first')
@@ -171,8 +169,6 @@ class read_ALL():
         
     
     def appendRecs(self,out):
-        # print()
-        # print(out['TimeStamp'],out['Updated'],out['MetadataFile'])
         df = pd.DataFrame(data=out['dataValues'],index=[out['TimeStamp']])
         df.index.name='TIMESTAMP'
         self.dataRecords = pd.concat([self.dataRecords,df])

@@ -9,7 +9,7 @@ import pandas as pd
 def getTime(Time,fmt = 'epoch'):
     try:
         if fmt == 'epoch':
-            return(pd.to_datetime(Time,unit='s'))
+            return(pd.to_datetime(float(Time),unit='s'))
         elif fmt == 'string':
             return(pd.to_datetime(Time))
     except:

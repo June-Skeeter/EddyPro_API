@@ -82,11 +82,11 @@ class Parse():
             self.EV.cleanLog(self.TimeStamp)
             self.Metadata_Filename = os.path.basename(templateFiles[-1])
         return({'TimeStamp':self.TimeStamp,
-                'dataValues':self.dataValues,
+                'dataValues':self.dataValues.copy(),
                 'MetadataFile':self.Metadata_Filename,
-                'Update':self.EV.dfLog['Update'],
-                'Flag':self.EV.dfLog['Flag'],
-                'calData':self.getCal.calData,
+                'Update':self.EV.dfLog['Update'].copy(),
+                'Flag':self.EV.dfLog['Flag'].copy(),
+                'calData':self.getCal.calData.copy(),
                 'Updated':self.Template_File})
 
     def readHeader(self,file):
@@ -123,8 +123,8 @@ class Parse():
                 #  Sonic Virtual Temp, eq 9 pg C-2: https://s.campbellsci.com/documents/ca/manuals/csat3_man.pdf
                 Data['t_sonic'] = (Data[key]**2/(1.4*287.04))
                 self.getStats(Data,'t_sonic')
-        print(self.TimeStamp)
-        print(self.dataValues['t_sonic'])
+        # print(self.TimeStamp)
+        # print(self.dataValues['t_sonic'])
         # Data['w_prime']=Data['w']-Data['w'].mean()
         # p_bar=Data['col_air_p'].mean()
         for key,val in self.Vars['Custom'].items():
