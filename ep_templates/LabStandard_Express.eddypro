@@ -2,8 +2,8 @@
 [Project]
 creation_date=2024-01-27T18:00:00
 last_change_date=2024-01-27T18:00:00
-file_name=ep_templates/DefaultSettings.eddypro
-run_mode=0
+file_name=ep_templates/LabStandard_Express.eddypro
+run_mode=1
 run_fcc=0
 project_title=DefaultSettings
 sw_version=7.0.9
@@ -11,9 +11,9 @@ ini_version=4.5.0
 project_id=
 file_type=0
 file_prototype=yyyy-mm-ddTHHMM??_LI-7200.ghg
-use_pfile=0
+use_pfile=1
 proj_file=
-use_dyn_md_file=0
+use_dyn_md_file=1
 dyn_metadata_file=
 binary_hnlines=-1
 binary_eol=-1
@@ -390,4 +390,3 @@ biom_ppfd=-1
 
 [RawProcess_WindDirectionFilter]
 wdf_apply=0
-

@@ -99,6 +99,12 @@ class Parse():
                 head = f.readlines()
                 self.data_columns = np.array(head[int(self.Metadata['FileDescription']['header_rows'])-3].replace('"', '').replace('\n','').split(self.delimiter))
                 self.data_units = np.array(head[int(self.Metadata['FileDescription']['header_rows'])-2].replace('"', '').replace('\n','').split(self.delimiter))
+
+        # Assumes site is running one 7200 or 7550, not both or multiples.  May need to implement more nuanced process if site has multiple co2 analyzers
+        if '72' in self.Metadata['Instruments']['instr_2_model']:
+            self.Vars['Project']['col_diag_75']=self.Vars['Project']['col_diag_75'].split(',',1)[1]
+        if '75' in self.Metadata['Instruments']['instr_2_model']:
+            self.Vars['Project']['col_diag_75']=self.Vars['Project']['col_diag_72'].split(',',1)[1]
         for to_process in ['Sonic','Project','Auxillary']:
             for key,val in self.Vars[to_process].items():
                 for rec in val.split(','):
@@ -137,9 +143,14 @@ class Parse():
             self.Write_EP_Template(Data.columns)              
               
     def Parse_Metadata(self,meta_file,MetadataTemplate_File):
+        
+
+        # Look for changes in the metadata file and return new metadata template file for each update
+        # Correct metadata where necessary (e.g., undocumented orientation change)
+        # See ini_files/Metadata_Instructions.ini for metadata varialbes bing 
+
         self.Metadata.read_file(meta_file)
 
-        # Correct metadata if necessary
         if self.ini['templates']['UpdateMetadata'] != '':
             Start = self.UpdateMetadata.index.get_level_values('Start')
             End = self.UpdateMetadata.index.get_level_values('End')
@@ -154,10 +165,8 @@ class Parse():
         templateList = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*_{self.Metadata['Station']['logger_id']}.metadata")]
         templateList.sort()
         templateFiles=[templateList[i] for i in range(len(templateList)) if os.path.basename(templateList[i]) < meta_file.name]
-        # print(templateFiles)
         if len(templateFiles)<1:
             MetadataTemplate_File = False
-
         if MetadataTemplate_File is True:
             self.MetadataTemplate.read_file(open(templateFiles[-1]))
             
@@ -178,7 +187,6 @@ class Parse():
                             MetadataTemplate_File = False
 
         if MetadataTemplate_File is False:    
-            # print(templateFiles)     
             self.MetadataTemplate.read_dict(self.Metadata)
             filename = f"{self.TimeStamp.strftime('%Y-%m-%dT%H%M%S')}_{self.Metadata['Station']['logger_id']}.metadata"
             self.Metadata_Filename = filename
@@ -205,6 +213,12 @@ class Parse():
             col_num = np.where(cols==key)[0]
             if len(col_num) == 0:
                 channel = 0
+            # elif (('72' in self.Metadata['Instruments']['instr_2_model']) or ('72' in self.Metadata['Instruments']['instr_3_model'])) and key == 'col_diag_75':
+            #     channel = 0
+            #     print(self.Metadata['Instruments']['instr_2_model'],key)
+            # elif (('75' in self.Metadata['Instruments']['instr_2_model']) or ('75' in self.Metadata['Instruments']['instr_3_model'])) and key == 'col_diag_72':
+            #     channel = 0
+            #     print(self.Metadata['Instruments']['instr_2_model'],key)
             elif len(col_num)>1:
                 # haven't encountered yet - just a catch to crash the program in case it happens
                 warning = f'Warning! Duplicate Channel {key} in Column Headers'
@@ -213,6 +227,7 @@ class Parse():
                 channel = int(col_num[0])
                 # break
             self.EddyProTemplate['Project'][key] = str(channel)
+            # print(key,self.EddyProTemplate['Project'][key])
 
         for key,value in self.Vars['RawProcess_BiometMeasurements'].items():
             match = [i for i in range(len(self.biometTraces)) if self.biometTraces[i] == value]

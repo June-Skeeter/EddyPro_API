@@ -39,7 +39,7 @@ class makeRun():
         # Parameters to update in template
         self.epDataCols = configparser.ConfigParser()
 
-        self.ini['Paths']['meta_dir'] = sub_path(self.ini['Paths']['metadata'])
+        self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
 
         self.inventory = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
         self.inventory['MetaDataFile'] = self.inventory['MetaDataFile'].fillna('-')
@@ -57,7 +57,7 @@ class makeRun():
         runList = []
         self.epRun['Project']['project_title']=name
         # Simple/tidy procedure for testing - replace with more secure process that doesn't overwrite outputs
-        output_path = sub_path(self.ini['Paths']['eddypro_output']) 
+        output_path = sub_path(self,self.ini['Paths']['eddypro_output']) 
         if os.path.isdir(output_path):
             shutil.rmtree(output_path)
         os.makedirs(output_path)

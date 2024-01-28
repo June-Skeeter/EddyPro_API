@@ -56,7 +56,7 @@ class read_ALL():
         
         # Check for new .ghg files - or overwrite if rest flag is set to true
         self.find_files(reset)
-        # self.Read(processes,Test,reset)
+        self.Read(processes,Test,reset)
 
     def find_files (self,reset=0):
         # Find the name of every FULL .ghg or .dat file in the raw data folder located at the end of directory tree
