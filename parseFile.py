@@ -49,7 +49,7 @@ class Parse():
         self.Template_File = Template_File
         name = input[0]
         self.TimeStamp = input[1]
-        self.fullFile = self.ini['Paths']['dpath']+"{:02d}".format(self.TimeStamp .month)+'/'+name
+        self.fullFile = self.ini['Paths']['dpath']+'/'+name
         _, self.file_type = name.rsplit('.',1)
         if self.file_type == 'ghg':
             with zipfile.ZipFile(self.fullFile, 'r') as ghgZip:

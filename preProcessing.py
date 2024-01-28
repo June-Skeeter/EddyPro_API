@@ -9,36 +9,32 @@ import configparser
 import numpy as np
 import pandas as pd
 from pathlib import Path
-
+from subPath import sub_path
 from multiprocessing import Pool
-
 from HelperFunctions import progressbar
-
 import parseFile
-
 import sys
-
 import importlib
 importlib.reload(parseFile)
 
 class read_ALL():
-    def __init__(self,Site,Year,processes=1,Test=0,reset=0):
-
-        # Concatenate the ini files
-        inis = ['configuration.ini','Metadata_Instructions.ini']
-        ini_file = ['ini_files/'+ini for ini in inis]
+    def __init__(self,SiteID,Year,Month,processes=1,Test=0,reset=0):
 
         self.Year = str(Year)
-        self.Site = Site
+        self.Month = "{:02d}".format(Month)
+        self.SiteID = SiteID
 
+        # Concatenate and read the ini files
+        inis = ['configuration.ini','Metadata_Instructions.ini']
+        ini_file = ['ini_files/'+ini for ini in inis]
         self.ini = configparser.ConfigParser()
         self.ini.read(ini_file)
         
-        self.MetadataTemplate = configparser.ConfigParser()
-        
-        self.ini['Paths']['dpath'] = self.sub(self.ini['Paths']['raw'])
-        self.ini['Paths']['meta_dir'] = self.sub(self.ini['Paths']['metadata'])
-        self.ini['Paths']['biomet_data'] = self.sub(self.ini['Paths']['biomet']+self.ini['filenames']['biomet'])
+        # self.MetadataTemplate = configparser.ConfigParser()
+        # Create directories from template (see configuration.ini)
+        self.ini['Paths']['dpath'] = sub_path(self,self.ini['Paths']['raw'])
+        self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
+        self.ini['Paths']['biomet_data'] = sub_path(self,self.ini['Paths']['biomet']+self.ini['filenames']['biomet'])
         
         self.ini['templates']['UpdateMetadata'] = self.ini['templates']['UpdateMetadata'].replace('METADATA',self.ini['Paths']['meta_dir'])
 
@@ -56,12 +52,11 @@ class read_ALL():
 
         if not os.path.exists(self.ini['Paths']['meta_dir']):
             Path(self.ini['Paths']['meta_dir']).mkdir(parents=True, exist_ok=True)
-        # self.EV = eventLog.EventLog()
         self.Logs = []
         
         # Check for new .ghg files - or overwrite if rest flag is set to true
         self.find_files(reset)
-        self.Read(processes,Test,reset)
+        # self.Read(processes,Test,reset)
 
     def find_files (self,reset=0):
         # Find the name of every FULL .ghg or .dat file in the raw data folder located at the end of directory tree
@@ -72,13 +67,11 @@ class read_ALL():
         # Get every .ghg or .dat file that is at the end of a directory tree
         all_files = []
         dates = []
-        for (root, dir, files) in os.walk(self.ini['Paths']['dpath']):
-            if root != self.ini['Paths']['dpath']:
-                for file in files:
-                    name, tag = file.rsplit('.',1)
-                    if (tag == 'ghg' or tag == 'dat') and len(dir)==0:
-                        all_files.append(file)
-                        dates.append(pd.to_datetime(re.search(self.ini['FileName_DateFormat'][tag], name)[0].replace('_','-')))
+        for file in os.listdir(self.ini['Paths']['dpath']):
+            name, tag = file.rsplit('.',1)
+            if (tag == 'ghg' or tag == 'dat'):
+                all_files.append(file)
+                dates.append(pd.to_datetime(re.search(self.ini['FileName_DateFormat'][tag], name)[0].replace('_','-')))
 
         # Create dataframe of all GHG files
         df = pd.DataFrame(data={'filename':all_files,'TIMESTAMP':dates})
@@ -89,6 +82,11 @@ class read_ALL():
         
         # Flag timestamps with incomplete records
         df.loc[(((df.index.minute!=30)&(df.index.minute!=0))|(df.index.second!=0)),'Flag'] = 'Incomplete Record'
+        for i,row in df.loc[((df['Flag']=='Incomplete Record')&(~df['filename'].str.contains('_incomplete')))].iterrows():
+            old_fn = row['filename']
+            new_fn = df.loc[df.index==i,'filename']=old_fn.split('.')[0]+'_incomplete.'+old_fn.split('.')[1]
+            os.rename(f"{self.ini['Paths']['dpath']}/{old_fn}",f"{self.ini['Paths']['dpath']}/{new_fn}")
+            
         # Resample to get timestamp on consistent half-hourly intervals
         df = df.resample('30T').first()
         # Write new file or append to existing file
@@ -110,7 +108,7 @@ class read_ALL():
     
     def sub(self,val):
         # update paths with relevant values
-        v = val.replace('YEAR',str(self.Year)).replace('SITE',self.Site)
+        v = val.replace('YEAR',str(self.Year)).replace('SiteID',self.SiteID)
         return(v)
     
     def Read(self,processes,Test,reset):
@@ -210,7 +208,7 @@ if __name__ == '__main__':
     CLI=argparse.ArgumentParser()
 
     CLI.add_argument(
-    "--site", 
+    "--SiteID", 
     nargs='+', # 1 or more values expected => creates a list
     type=str,
     default=['BB','BB2','BBS','RBM','DSM','HOGG','YOUNG'],
@@ -248,5 +246,5 @@ if __name__ == '__main__':
     # parse the command line
     args = CLI.parse_args()
     
-    read_ALL(args.site[0],args.year[0],args.processes,args.Test,args.reset)
+    read_ALL(args.SiteID[0],args.year[0],args.processes,args.Test,args.reset)
 

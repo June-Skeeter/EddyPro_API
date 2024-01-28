@@ -8,6 +8,7 @@ import configparser
 import numpy as np
 import pandas as pd
 import multiprocessing
+from subPath import sub_path
 from multiprocessing import Pool
 from datetime import datetime
 
@@ -18,14 +19,14 @@ from HelperFunctions import progressbar
 
 class makeRun():
 
-    def __init__(self,template_file,Site):
+    def __init__(self,template_file,SiteID):
         
         inis = ['configuration.ini']
         ini_file = ['ini_files/'+ini for ini in inis]
         self.ini = configparser.ConfigParser()
         self.ini.read(ini_file)
         
-        self.Site = Site
+        self.SiteID = SiteID
 
         # Template file to be filled updated
         self.epRun = configparser.ConfigParser()
@@ -38,25 +39,25 @@ class makeRun():
         # Parameters to update in template
         self.epDataCols = configparser.ConfigParser()
 
-        self.ini['Paths']['meta_dir'] = self.sub(self.ini['Paths']['metadata'])
+        self.ini['Paths']['meta_dir'] = sub_path(self.ini['Paths']['metadata'])
 
         self.inventory = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
         self.inventory['MetaDataFile'] = self.inventory['MetaDataFile'].fillna('-')
         self.inventory = self.inventory.loc[self.inventory['MetaDataFile']!='-']
 
-    def sub(self,val):
-        v = val.replace('SITE',self.Site)
-        if hasattr(self, 'Year'):
-            v = v.replace('YEAR',str(self.Year))
-        if hasattr(self, 'dateStr'):
-            v = v.replace('DATE',str(self.dateStr))
-        return(v)
+    # def sub(self,val):
+    #     v = val.replace('SiteID',self.SiteID)
+    #     if hasattr(self, 'Year'):
+    #         v = v.replace('YEAR',str(self.Year))
+    #     if hasattr(self, 'dateStr'):
+    #         v = v.replace('DATE',str(self.dateStr))
+    #     return(v)
     
     def runDates(self,dateRange,name,threads = 2,priority = 'normal'):
         runList = []
         self.epRun['Project']['project_title']=name
         # Simple/tidy procedure for testing - replace with more secure process that doesn't overwrite outputs
-        output_path = self.sub(self.ini['Paths']['eddypro_output']) 
+        output_path = sub_path(self.ini['Paths']['eddypro_output']) 
         if os.path.isdir(output_path):
             shutil.rmtree(output_path)
         os.makedirs(output_path)
