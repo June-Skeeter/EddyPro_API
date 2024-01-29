@@ -51,6 +51,7 @@ class read_LI_Config():
                 val['Parameter']=key
 
                 self.calData = pd.concat([self.calData,pd.DataFrame(index=[0],data=val)])
+        self.formatReturn()
 
     def parse(self,string,key,TimeStamp,pnt=False):
         all = re.findall(r'\((.+?)\)',string)
@@ -96,10 +97,15 @@ class read_LI_Config():
                     if root.tag == 'li7500ds':fmt = 'epoch'
                     else: fmt = 'string'
                     rep = getTime(rep,fmt=fmt)
+                    # key='TIMESTAMP'
                 if 'Zero' in parameter:
                     values_copy['target']=0
                 values_copy[key]=rep
             if pd.isnull(values_copy['date']) == False:
                 values_copy['Parameter']=parameter
-                self.calData = pd.concat([self.calData,pd.DataFrame(index=[TimeStamp],data=values_copy)])
-        
+                self.calData = pd.concat([self.calData,pd.DataFrame(index=[0],data=values_copy)])
+        self.formatReturn()
+
+    def formatReturn(self):
+        self.calData.set_index(self.calData['date'].dt.floor('30T'),inplace=True,drop=True)
+        self.calData.index = self.calData.index.rename('TIMESTAMP')

@@ -79,6 +79,7 @@ class read_ALL():
         df['Flag']='-'
         df['MetaDataFile'] = '-'
         df['Update']='-'
+        df['setup_ID']=np.nan
         
         # Flag timestamps with incomplete records
         df.loc[(((df.index.minute!=30)&(df.index.minute!=0))|(df.index.second!=0)),'Flag'] = 'Incomplete Record'
@@ -90,15 +91,15 @@ class read_ALL():
         # Resample to get timestamp on consistent half-hourly intervals
         df = df.resample('30T').first()
         # Write new file or append to existing file
-        if reset == 1 or os.path.isfile(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory']) == False:
+        if reset == 1 or os.path.isfile(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory']) == False:
             # Sort so that oldest files get processed first
             self.files = df.sort_index()#ascending=False)
-            self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory'])
+            self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
         else:
-            self.files = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+            self.files = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
             self.files = pd.concat([self.files,df.loc[df.index.isin(self.files.index)==False]])
-            # Sort so that newest files get processed first
-            self.files = self.files.sort_index(ascending=False)
+            # Sort so that oldest files get processed first
+            self.files = self.files.sort_index()#ascending=False)
 
     def makeEmpty(self,type='object',ixName='TIMESTAMP'):
         # Make an empty dataframe
@@ -106,35 +107,41 @@ class read_ALL():
         empty.index.name=ixName
         return(empty)
     
-    def sub(self,val):
-        # update paths with relevant values
-        v = val.replace('YEAR',str(self.Year)).replace('SiteID',self.SiteID)
-        return(v)
-    
     def Read(self,processes,Test,reset):
         
-        # Read existing data records if they exist, create empty ones if they don't
-        if reset == 0 and os.path.isfile(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory']):
+        # Read existing data records if they exist, create empty ones if they don't exist
+        if reset == 0 and os.path.isfile(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory']):
             self.dataRecords = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
-            self.Calibration = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])#,parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+            self.dynamic_metadata = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['dynamic_metadata'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+            self.site_setup = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['site_setup'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+            self.Calibration = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
         else:
             self.dataRecords = self.makeEmpty(type='float')
+            self.dynamic_metadata = self.makeEmpty(type='float')
+            self.site_setup = self.makeEmpty(type='float')
             self.Calibration = self.makeEmpty()#ixName='TIMESTAMP')
 
         # Empty log for current run
         self.Log = self.makeEmpty()
 
         if Test > 0:
-            self.to_Process = self.files.loc[self.files['Flag']=='-'][:Test]
+            self.to_Process = self.files.loc[self.files['setup_ID'].isna()][:Test]
         else:
-            self.to_Process = self.files.loc[self.files['Flag']=='-']
+            self.to_Process = self.files.loc[self.files['setup_ID'].isna()]
 
         NameList = self.to_Process['filename'].values
         TimeList = self.to_Process.index
 
-        # Run once to get the first Metadata file and use it as a template
-        self.Parser.process_file([NameList[0],TimeList[0]],Template_File=False)
-        
+        if reset == 1:
+            # Run once to get the first Metadata file and use it as a template
+            self.Parser.process_file([NameList[0],TimeList[0]],Template_File=False)
+        # else:
+        #     # Run once to get the first Metadata file and use it as a template
+        #     Template_File = self.files.loc[self.files['MetaDataFile']!='-','MetaDataFile'].values[-1]
+        #     print(Template_File)
+        #     self.Parser.process_file([NameList[0],TimeList[0]],Template_File=self.ini['Paths']['meta_dir']+Template_File)
+
+
         # Use parallel processing to speed things up unless otherwise instructed
         if (__name__ == 'preProcessing' or __name__ == '__main__') and processes>1:
             pb = progressbar(len(NameList),'Preprocessing Files')
@@ -144,7 +151,7 @@ class read_ALL():
                 max_chunksize=48
                 chunksize=min(int(np.ceil(len(NameList)/processes)),max_chunksize)
                 
-                for i, out in enumerate(pool.imap(self.Parser.process_file,zip(NameList,TimeList),chunksize=chunksize)):
+                for out in pool.imap(self.Parser.process_file,zip(NameList,TimeList),chunksize=chunksize):
                     self.appendRecs(out)
                     pb.step()
                 pool.close()
@@ -156,20 +163,18 @@ class read_ALL():
                 self.appendRecs(out)
                 self.out = out
 
-
-        self.dataRecords = self.dataRecords.drop_duplicates(keep='first')
-        self.dataRecords.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means'])
-        self.Calibration = self.Calibration.drop_duplicates(keep='first')
-        self.Calibration.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
-        self.GroupRuns()
-        self.files = self.files.join(self.Logs)
-        self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory'])
-        
+        self.prepareOutputs()        
     
     def appendRecs(self,out):
         df = pd.DataFrame(data=out['dataValues'],index=[out['TimeStamp']])
         df.index.name='TIMESTAMP'
-        self.dataRecords = pd.concat([self.dataRecords,df])
+
+        dyn = self.ini['Monitor']['dynamic_metadata'].split(',')
+        self.dynamic_metadata = pd.concat([self.dynamic_metadata,df[dyn]])
+        stup = self.ini['Monitor']['site_setup'].split(',')
+        self.site_setup = pd.concat([self.site_setup,df[stup]])
+
+        self.dataRecords = pd.concat([self.dataRecords,df.loc[:,df.columns.isin(dyn+stup)==False]])
         self.files['Flag'] = self.files['Flag'].replace('-',np.nan)
         self.files['Flag'] = self.files['Flag'].fillna(out['Flag'])
         self.files['Flag'] = self.files['Flag'].fillna('-')
@@ -178,9 +183,29 @@ class read_ALL():
         self.files['Update'] = self.files['Update'].fillna('-')
         self.files.loc[self.files.index==out['TimeStamp'],'MetaDataFile'] = out['MetadataFile']
         self.Calibration = pd.concat([self.Calibration,out['calData']])
+    
+    def prepareOutputs(self):
+        self.GroupCommon()
+        self.dataRecords.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means'])
+        self.dynamic_metadata.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['dynamic_metadata'])
+        self.site_setup.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['site_setup'])
+        self.Calibration.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
+        self.GroupRuns()
+        self.files = self.files.join(self.Logs)
+        self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
+
+    def GroupCommon(self):
+        self.site_setup['temp_ID'] = self.site_setup.reset_index().index
+        self.site_setup['temp_ID'] = self.site_setup.groupby(self.ini['Monitor']['site_setup'].split(','))[['temp_ID']].transform(lambda x: x.min())
+        self.site_setup['setup_ID']=np.nan
+        for i,val in enumerate(self.site_setup['temp_ID'].unique()):
+            self.site_setup.loc[self.site_setup['temp_ID']==val,'setup_ID'] = i
+        self.files.loc[self.site_setup.index,'setup_ID']=self.files.loc[self.site_setup.index,'setup_ID'].index.map(self.site_setup['setup_ID'])
+        self.site_setup = self.site_setup.drop_duplicates(keep='first')
+        self.Calibration = self.Calibration.drop_duplicates(keep='first')
 
     def GroupRuns(self):
-        Updates = self.files.loc[self.files['Update']!='-'].copy()#.duplicated()
+        Updates = self.files.loc[self.files['Update']!='-'].copy()
         Updates['dup'] = Updates['Update'].duplicated()
         toRemove = Updates.loc[Updates['dup']==True,'MetaDataFile'].values
         for rem in toRemove:
@@ -189,12 +214,14 @@ class read_ALL():
                 os.remove(f"{self.ini['Paths']['meta_dir']}{rem}")
             if os.path.isfile(f"{self.ini['Paths']['meta_dir']}{rem.replace('.metadata','.eddypro')}"):
                 os.remove(f"{self.ini['Paths']['meta_dir']}{rem.replace('.metadata','.eddypro')}")
+        
         Updates.loc[Updates['dup']==True,['Update','MetaDataFile']]=np.nan
         Updates['Update'].fillna('-',inplace=True)
         Updates['MetaDataFile'].ffill(inplace=True)
         self.files.loc[self.files['Update']!='-',['Update','MetaDataFile']] = Updates[['Update','MetaDataFile']]
         self.files['MetaDataFile'].ffill(inplace=True)
         
+    # def Report(self):
 
 
 # If called from command line ...
