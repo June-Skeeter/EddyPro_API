@@ -166,18 +166,20 @@ class Parse():
         templateList = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*_{self.Metadata['Station']['logger_id']}.metadata")]
         templateList.sort()
         templateFiles=[templateList[i] for i in range(len(templateList)) if os.path.basename(templateList[i]) < meta_file.name]
+
+
         if len(templateFiles)<1:
             MetadataTemplate_File = False
             
         if MetadataTemplate_File is True:
             self.MetadataTemplate.read_file(open(templateFiles[-1]))
-            self.check_values(MetadataTemplate_File)
+            MetadataTemplate_File=self.check_values(MetadataTemplate_File)
             
         if MetadataTemplate_File is False:    
             self.MetadataTemplate.read_dict(self.Metadata)
             filename = f"{self.TimeStamp.strftime('%Y-%m-%dT%H%M%S')}_{self.Metadata['Station']['logger_id']}.metadata"
             self.Metadata_Filename = filename
-            self.check_values(MetadataTemplate_File)
+            MetadataTemplate_File=self.check_values(MetadataTemplate_File)
                     
             with open(f"{self.ini['Paths']['meta_dir']}{filename}", 'w') as template:
                 template.write(';GHG_METADATA\n')

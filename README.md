@@ -8,11 +8,6 @@ This project is still under development.
 
 This API is intended to streamline flux estimation using Eddy Pro.  The API allows you to run EddyPro in parallel batches to speed up processing.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI
 
-## Issues
-
-* Redundant metadata files
-* Time lag optimization
-* Cospectral analysis
 
 ## Workflow
 
@@ -34,6 +29,17 @@ This API is intended to streamline flux estimation using Eddy Pro.  The API allo
 * Group the metadata into blocks of time with uniform (or acceptably similar) settings
 * For each such period create a .metadata file and .eddypro file with time-period specific settings.
 
-## Part 2: Running Eddypro
+### Running Eddypro
 
-Create a .eddypro template, either using the GUI, or editing one of the templates included here.  Then call EddyPro to run over a given time period - the API will handle updating the time period specific settings and partitioning the outputs by relevant period.  Where necessary, the API will separate cospectral inputs/outputs by accordingly.
+Create a .eddypro template, either using the GUI, editing one of the templates included here.  Then call EddyPro to run over a given time period - the API will handle updating the time period specific settings and partitioning the outputs by relevant period.  Where necessary, the API will separate cospectral inputs/outputs by accordingly.
+
+
+
+## Pending Tasks
+
+* Enhance documentation
+* Update naming conventions and handling of output files to be more organized and prevent overwriting outputs
+* Put metadata update files in more sensible (site specific) location
+* Time lag optimization
+* Cospectral analysis
+* Setup to use .dat files as well

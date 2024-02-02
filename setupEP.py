@@ -2,8 +2,10 @@
 # Created by Dr. June Skeeter
 
 import os
+import sys
 import runEP
 import shutil
+import argparse
 import configparser
 import numpy as np
 import pandas as pd
@@ -41,7 +43,7 @@ class makeRun():
 
         self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
 
-        self.inventory = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+        self.inventory = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
         self.inventory['MetaDataFile'] = self.inventory['MetaDataFile'].fillna('-')
         self.inventory = self.inventory.loc[self.inventory['MetaDataFile']!='-']
 
@@ -53,7 +55,7 @@ class makeRun():
     #         v = v.replace('DATE',str(self.dateStr))
     #     return(v)
     
-    def runDates(self,dateRange,name,threads = 2,priority = 'normal'):
+    def runDates(self,dateRange,name,Processes = 2,priority = 'normal'):
         runList = []
         self.epRun['Project']['project_title']=name
         # Simple/tidy procedure for testing - replace with more secure process that doesn't overwrite outputs
@@ -71,13 +73,18 @@ class makeRun():
         Subset_Inventory = self.inventory.loc[((self.inventory.index>=Range_index[0])&(self.inventory.index<=Range_index[1]))].copy()
         Metadata_Files_in_Range = Subset_Inventory['MetaDataFile'].unique()
 
-        # Each unique (based on metadata files) time period within the range index will be split by the number of threads
+        # Each unique (based on metadata files) time period within the range index will be split by the number of Processes
+        if len(Metadata_Files_in_Range)>1:
+            print(f"Splitting into {len(Metadata_Files_in_Range)} batches due to update metadata")
         for Metadata_File in Metadata_Files_in_Range:
             Range_index = Subset_Inventory.loc[Subset_Inventory['MetaDataFile']==Metadata_File].index
-            print(Range_index.size)
-            step = np.floor(Range_index.size/threads)
-            for i,ix in enumerate([[int(i*step),int(i*step+step)] for i in range(threads)]):
-                if i<threads-1:
+            step = np.floor(Range_index.size/Processes)
+            if step <= Processes:
+                print(f"Insufficient number of files in batch for multiprocessing")
+                Processes = 1
+                step = np.floor(Range_index.size/Processes)
+            for i,ix in enumerate([[int(i*step),int(i*step+step)] for i in range(Processes)]):
+                if i<Processes-1:
                     run_ix = Range_index[ix[0]:ix[1]]
                 else: # Final thread will play cleanup and get any extra runs
                     run_ix = Range_index[ix[0]:]
@@ -116,11 +123,11 @@ class makeRun():
                     self.epRun.write(eddypro,space_around_delimiters=False)
                     runList.append(file_name)   
 
-        if (__name__ == 'setupEP' or __name__ == '__main__') :
-            with Pool(processes=threads) as pool:
-                threads = multiprocessing.active_children()
+        if (__name__ == 'setupEP' or __name__ == '__main__') and Processes > 1 :
+            with Pool(processes=Processes) as pool:
+                Processes = multiprocessing.active_children()
                 
-                for thread in threads:
+                for thread in Processes:
                     cwd = os.getcwd()
                     bin = cwd+f'/temp/{thread.pid}/bin/'
                     ini = cwd+f'/temp/{thread.pid}/ini/'
@@ -141,7 +148,93 @@ class makeRun():
                 pb = progressbar(len(runList),'Running EddyPro')
                 for i,_ in enumerate(pool.imap(runEP.Batch,runList)):
                     pb.step()
-                for thread in threads:
+                for thread in Processes:
                     shutil.rmtree(os.getcwd()+f'/temp/{thread.pid}')
 
                 pool.close()
+        else:
+            cwd = os.getcwd()
+            bin = cwd+f'/temp/{os.getpid()}/bin/'
+            ini = cwd+f'/temp/{os.getpid()}/ini/'
+            shutil.copytree(self.ini['Paths']['eddypro_installation'],bin)
+            batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
+            with open(batchFile, 'w') as batch:
+                contents = f'cd {bin}'
+                P = priority.upper().replace(' ','')
+                contents+=f'\nSTART /{P} '+self.ini['filenames']['eddypro_rp']
+                contents+='\n'+f'WMIC process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{priority}"'
+                contents+='\nSTART '+self.ini['filenames']['eddypro_fcc']
+                contents+='\nEXIT'
+                batch.write(contents)
+            os.mkdir(ini)
+            for r in runList:
+                runEP.Batch(r)
+            # input("Press Enter to exit...")
+            shutil.rmtree(os.getcwd()+f'/temp/{os.getpid()}')
+            
+
+
+# If called from command line ...
+if __name__ == '__main__':
+    
+    # Set to cwd to location of the current script
+    Home_Dir = os.path.dirname(sys.argv[0])
+    os.chdir(Home_Dir)
+
+    # Parse the arguments
+    CLI=argparse.ArgumentParser()
+    
+    CLI.add_argument(
+    "--SiteID", 
+    nargs="?",# Use "?" to limit to one argument instead of list of arguments
+    type=str,
+    default='BB',
+    )
+
+    CLI.add_argument(
+    "--Template", 
+    nargs="?",# Use "?" to limit to one argument instead of list of arguments
+    type=str,
+    default='ep_Templates/LabStandard_Advanced.eddypro',
+    )
+    
+    CLI.add_argument(
+    "--Name", 
+    nargs='+', # 1 or more values expected => creates a list
+    type=str,
+    default='EddyPro_API_Run',
+    )
+    
+    CLI.add_argument(
+    "--Processes", 
+    nargs="?",# Use "?" to limit to one argument instead of list of arguments
+    type=int,  
+    default=4,
+    )
+
+    CLI.add_argument(
+    "--Priority", 
+    nargs="?",# Use "?" to limit to one argument instead of list of arguments
+    type=str,  
+    default='high',
+    )
+
+    CLI.add_argument(
+    "--RunDates", 
+    nargs='+', # 1 or more values expected => creates a list
+    type=str,
+    default=[],
+    )
+
+    # parse the command line
+    args = CLI.parse_args()
+
+
+    print(f'Initializing {args.Name} run for {args.SiteID} with {args.Processes} processes at {args.Priority} priority level')
+    
+    mR = makeRun(args.Template,args.SiteID)
+
+    for start,end in zip(args.RunDates[::2],args.RunDates[1::2]):
+        mR.runDates([start,end],args.Name,args.Processes,args.Priority)
+        print(f'Processing date range {start} - {end}')
+

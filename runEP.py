@@ -27,4 +27,6 @@ def Batch(toRun):
     log_file = toRun.replace('.eddypro','_log.txt')
     with open(log_file, 'w') as log:
         log.write(p.stdout.decode('utf-8'))
+        log.write('\n')
+        log.write(p.stderr.decode('utf-8'))
 
