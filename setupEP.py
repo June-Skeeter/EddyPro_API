@@ -10,14 +10,14 @@ import configparser
 import numpy as np
 import pandas as pd
 import multiprocessing
-from subPath import sub_path
+# from subPath import sub_path
 from multiprocessing import Pool
 from datetime import datetime
 
 import importlib
 importlib.reload(runEP)
 
-from HelperFunctions import progressbar
+from HelperFunctions import progressbar, sub_path
 
 class makeRun():
 

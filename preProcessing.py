@@ -9,7 +9,8 @@ import configparser
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from subPath import sub_path
+# from subPath import sub_path
+from HelperFunctions import sub_path
 from multiprocessing import Pool
 from HelperFunctions import progressbar
 import parseFile

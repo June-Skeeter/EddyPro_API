@@ -16,8 +16,10 @@ import importlib
 
 import readLiConfigFiles as rLCF
 importlib.reload(rLCF)
-import eventLog as eL
-importlib.reload(eL)
+
+from HelperFunctions import EventLog as eL
+# import eventLog as eL
+# importlib.reload(eL)
 
 
 class Parse():
@@ -42,7 +44,7 @@ class Parse():
         
         self.dataValues = {}
 
-        self.EV = eL.EventLog()
+        self.EV = eL()
         self.getCal = rLCF.read_LI_Config(Log=self.EV)
 
     def process_file(self,input,Template_File=True,Testing=False):
