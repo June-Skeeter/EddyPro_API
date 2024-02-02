@@ -21,7 +21,9 @@ from HelperFunctions import progressbar
 
 class makeRun():
 
-    def __init__(self,template_file,SiteID):
+    def __init__(self,template_file,SiteID,testing=False):
+
+        self.DeBug = testing
         
         inis = ['configuration.ini']
         ini_file = ['ini_files/'+ini for ini in inis]
@@ -136,11 +138,20 @@ class makeRun():
 
                     batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
                     with open(batchFile, 'w') as batch:
+                        # contents = f'cd {bin}'
+                        # P = priority.upper().replace(' ','')
+                        # contents+=f'\nSTART /{P} '+self.ini['filenames']['eddypro_rp']
+                        # contents+='\n'+f'WMIC process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{priority}"'
+                        # contents+='\nSTART '+self.ini['filenames']['eddypro_fcc']
+                        # contents+='\nEXIT'
+                        # batch.write(contents)
+                        
                         contents = f'cd {bin}'
-                        P = priority.upper().replace(' ','')
-                        contents+=f'\nSTART /{P} '+self.ini['filenames']['eddypro_rp']
-                        contents+='\n'+f'WMIC process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{priority}"'
-                        contents+='\nSTART '+self.ini['filenames']['eddypro_fcc']
+                        P = priority.lower().replace(' ','')
+                        contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
+                        contents+='\nping 127.0.0.1 -n 6 > nul'
+                        contents+=f'\nwmic process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{priority}"'
+                        contents+='\nping 127.0.0.1 -n 6 > nul'
                         contents+='\nEXIT'
                         batch.write(contents)
                     os.mkdir(ini)
@@ -156,21 +167,27 @@ class makeRun():
             cwd = os.getcwd()
             bin = cwd+f'/temp/{os.getpid()}/bin/'
             ini = cwd+f'/temp/{os.getpid()}/ini/'
+            if self.DeBug == True:
+                try:
+                    shutil.rmtree(os.getcwd()+f'/temp/{os.getpid()}')
+                except:
+                    pass
             shutil.copytree(self.ini['Paths']['eddypro_installation'],bin)
             batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
             with open(batchFile, 'w') as batch:
                 contents = f'cd {bin}'
-                P = priority.upper().replace(' ','')
-                contents+=f'\nSTART /{P} '+self.ini['filenames']['eddypro_rp']
-                contents+='\n'+f'WMIC process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{priority}"'
-                contents+='\nSTART '+self.ini['filenames']['eddypro_fcc']
+                P = priority.lower().replace(' ','')
+                contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
+                contents+='\nping 127.0.0.1 -n 6 > nul'
+                contents+=f'\nwmic process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{priority}"'
+                contents+='\nping 127.0.0.1 -n 6 > nul'
                 contents+='\nEXIT'
                 batch.write(contents)
             os.mkdir(ini)
             for r in runList:
                 runEP.Batch(r)
-            # input("Press Enter to exit...")
-            shutil.rmtree(os.getcwd()+f'/temp/{os.getpid()}')
+            if self.DeBug == False:
+                shutil.rmtree(os.getcwd()+f'/temp/{os.getpid()}')
             
 
 

@@ -22,11 +22,14 @@ def Batch(toRun):
     bin = cwd+f'/temp/{pid}/bin/'
     batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
 
-    p = run(batchFile, capture_output=True)
+    run(['cmd', '/c', batchFile], capture_output=True)
     
-    log_file = toRun.replace('.eddypro','_log.txt')
-    with open(log_file, 'w') as log:
-        log.write(p.stdout.decode('utf-8'))
-        log.write('\n')
-        log.write(p.stderr.decode('utf-8'))
+    shutil.copy(bin+'processing_log.txt',toRun.replace('.eddypro','_log.txt'))
+
+
+    # log_file = toRun.replace('.eddypro','_log.txt')
+    # with open(log_file, 'w') as log:
+    #     log.write(p.stdout.decode('utf-8'))
+    #     log.write('\n')
+    #     log.write(p.stderr.decode('utf-8'))
 
