@@ -8,6 +8,10 @@ This project is still under development.
 
 This API is intended to streamline flux estimation using Eddy Pro.  The API allows you to run EddyPro in parallel batches to speed up processing.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI
 
+## For Winmet
+
+> Set-ExecutionPolicy Unrestricted -Scope Process
+> PS C:\Users\labuser\EddyPro_API\.venv\Scripts> .\Activate.ps1
 
 ## Workflow
 
