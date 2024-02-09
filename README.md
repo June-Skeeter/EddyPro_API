@@ -14,7 +14,17 @@ This API is intended to streamline flux estimation using Eddy Pro.  The API allo
 
 ### Preprocessing
 
-1. Read high frequency data in .ghg or .data format.
+1. Read high frequency data in .ghg or .dat (not yet done) format.
+
+Example call from command line:
+
+```
+
+py .\preProcessing.py --SiteID BB --Years 2022 --Processes 4
+
+```
+
+* This will parse all data, month by month for the BB site in the highfreq folder using four cores to speed up processing time.
 
 * **If .ghg data** 
     * Extract the data and read relevant sub-files
@@ -25,6 +35,16 @@ This API is intended to streamline flux estimation using Eddy Pro.  The API allo
 * **If other .data files**
 
 2. Create metadata template files
+
+
+Example call from command line:
+
+```
+py .\setupEP.py --SiteID BB --Template ep_templates/LabStandard_Advanced.eddypro --RunDates "2022-07-01 00:00" "2022-07-31 23:59" 
+
+```
+
+* This will calculate fluxes for BB over July, 2022 using the lab standard template
 
 * Group the metadata into blocks of time with uniform (or acceptably similar) settings
 * For each such period create a .metadata file and .eddypro file with time-period specific settings.
@@ -38,6 +58,8 @@ Create a .eddypro template, either using the GUI, editing one of the templates i
 ## Pending Tasks
 
 * Enhance documentation
+* Procedures for updating slices of preprocessing without re-running whole batches
+* Concatenate output files
 * Update naming conventions and handling of output files to be more organized and prevent overwriting outputs
 * Put metadata update files in more sensible (site specific) location
 * Time lag optimization

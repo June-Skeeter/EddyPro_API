@@ -10,9 +10,9 @@ import configparser
 import numpy as np
 import pandas as pd
 import multiprocessing
-# from subPath import sub_path
 from multiprocessing import Pool
 from datetime import datetime
+import time
 
 import importlib
 importlib.reload(runEP)
@@ -43,19 +43,12 @@ class makeRun():
         # Parameters to update in template
         self.epDataCols = configparser.ConfigParser()
 
+        self.Root = self.ini['Paths']['root_data_dir']
         self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
 
         self.inventory = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
         self.inventory['MetaDataFile'] = self.inventory['MetaDataFile'].fillna('-')
         self.inventory = self.inventory.loc[self.inventory['MetaDataFile']!='-']
-
-    # def sub(self,val):
-    #     v = val.replace('SiteID',self.SiteID)
-    #     if hasattr(self, 'Year'):
-    #         v = v.replace('YEAR',str(self.Year))
-    #     if hasattr(self, 'dateStr'):
-    #         v = v.replace('DATE',str(self.dateStr))
-    #     return(v)
     
     def runDates(self,dateRange,name,Processes = 2,priority = 'normal'):
         runList = []
@@ -65,7 +58,7 @@ class makeRun():
         if os.path.isdir(output_path):
             shutil.rmtree(output_path)
         os.makedirs(output_path)
-        batch_path = output_path+'EP_Runs/'
+        batch_path = output_path+'EP_Batch_Logs/'
         if os.path.isdir(batch_path):
             shutil.rmtree(batch_path)
         os.makedirs(batch_path)
@@ -73,12 +66,12 @@ class makeRun():
         # Setup the runs - first find all unique metadata files in a given time-window
         Range_index = pd.DatetimeIndex(dateRange)
         Subset_Inventory = self.inventory.loc[((self.inventory.index>=Range_index[0])&(self.inventory.index<=Range_index[1]))].copy()
-        Metadata_Files_in_Range = Subset_Inventory['MetaDataFile'].unique()
+        Metadata_Files_in_Range = Subset_Inventory.groupby(['MetaDataFile','name_pattern']).first().index.values
 
         # Each unique (based on metadata files) time period within the range index will be split by the number of Processes
         if len(Metadata_Files_in_Range)>1:
             print(f"Splitting into {len(Metadata_Files_in_Range)} batches due to update metadata")
-        for Metadata_File in Metadata_Files_in_Range:
+        for Metadata_File,search_pattern in Metadata_Files_in_Range:
             Range_index = Subset_Inventory.loc[Subset_Inventory['MetaDataFile']==Metadata_File].index
             step = np.floor(Range_index.size/Processes)
             if step <= Processes:
@@ -112,6 +105,7 @@ class makeRun():
                 # Dump the template values in to the run file
                 for section in self.epDataCols.keys(): 
                     for key,value in self.epDataCols[section].items():
+                        print(key,value)
                         self.epRun[section][key]=value
 
                 # Dump custom values using eval statement (see ini_files/EP_Dynamic_Updates.ini)
@@ -125,7 +119,7 @@ class makeRun():
                     self.epRun.write(eddypro,space_around_delimiters=False)
                     runList.append(file_name)   
 
-        if (__name__ == 'setupEP' or __name__ == '__main__') and Processes > 1 :
+        if (__name__ == 'setupEP' or __name__ == '__main__') and Processes > 1 and len(runList) > 0:
             with Pool(processes=Processes) as pool:
                 Processes = multiprocessing.active_children()
                 
@@ -137,15 +131,7 @@ class makeRun():
                     shutil.copytree(self.ini['Paths']['eddypro_installation'],bin)
 
                     batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
-                    with open(batchFile, 'w') as batch:
-                        # contents = f'cd {bin}'
-                        # P = priority.upper().replace(' ','')
-                        # contents+=f'\nSTART /{P} '+self.ini['filenames']['eddypro_rp']
-                        # contents+='\n'+f'WMIC process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{priority}"'
-                        # contents+='\nSTART '+self.ini['filenames']['eddypro_fcc']
-                        # contents+='\nEXIT'
-                        # batch.write(contents)
-                        
+                    with open(batchFile, 'w') as batch:                        
                         contents = f'cd {bin}'
                         P = priority.lower().replace(' ','')
                         contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
@@ -233,7 +219,7 @@ if __name__ == '__main__':
     "--Priority", 
     nargs="?",# Use "?" to limit to one argument instead of list of arguments
     type=str,  
-    default='high',
+    default='high priority',
     )
 
     CLI.add_argument(
@@ -252,6 +238,9 @@ if __name__ == '__main__':
     mR = makeRun(args.Template,args.SiteID)
 
     for start,end in zip(args.RunDates[::2],args.RunDates[1::2]):
-        mR.runDates([start,end],args.Name,args.Processes,args.Priority)
+        t1 = time.time()
         print(f'Processing date range {start} - {end}')
+        print(args.Name)
+        mR.runDates([start,end],args.Name,args.Processes,args.Priority)
+        print(f'Completed in: {np.round(time.time()-t1,4)} seconds')
 

@@ -6,6 +6,13 @@ import pandas as pd
 # remove from the path if it doesn't exist
 
 def sub_path(class_object,path_string):
+
+    
+    if hasattr(class_object, 'Root'):
+        path_string = path_string.replace('ROOT_PATH',str(class_object.Root))
+    else:
+        path_string = path_string.replace('ROOT_PATH','')
+
     if hasattr(class_object, 'Year'):
         path_string = path_string.replace('YEAR',str(class_object.Year))
     else:
