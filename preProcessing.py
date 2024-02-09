@@ -130,6 +130,7 @@ class read_ALL():
                         TIMESTAMP =  datetime.strptime(srch,self.ini[self.file_type]['format'])
                         if str(TIMESTAMP.year) == self.Year and str(TIMESTAMP.month).zfill(2) == self.Month:
                             shutil.copy(f"{dir}/{file}",f"{self.ini['Paths']['dpath']}/{file}")
+            pb.close()
 
 
     def makeEmpty(self,type='object',ixName='TIMESTAMP'):
@@ -143,7 +144,7 @@ class read_ALL():
         # Read existing data records if they exist, create empty ones if they don't exist
         if reset == 0 and os.path.isfile(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means']):
             self.dataRecords = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
-            self.dynamic_metadata = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['dynamic_metadata'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+            self.dynamic_metadata = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['dynamic_metadata'],parse_dates={'TIMESTAMP':['date','time']},index_col='TIMESTAMP')
             self.site_setup = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['site_setup'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
             self.Calibration = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
         else:
@@ -178,7 +179,7 @@ class read_ALL():
                         self.appendRecs(out)
                         pb.step()
                     pool.close()
-
+                    pb.close()
             # Sequential processing is helpful for trouble shooting but will run much slower
             else:
                 for fn,ts in zip(NameList,TimeList):
@@ -211,8 +212,24 @@ class read_ALL():
     
     def prepareOutputs(self):
         self.GroupCommon()
+        dyn = self.ini['Monitor']['dynamic_metadata'].split(',')
+        static = [d for d in dyn if d in self.ini['Monitor']['fixed_dynamic']]
+        dyn = [d for d in dyn if d not in self.ini['Monitor']['fixed_dynamic']]
+        for s in static:
+            self.dataRecords[s] = self.dynamic_metadata[s].mean()
+            self.dataRecords[s+'_1SE'] = self.dynamic_metadata[s].std()/(self.dynamic_metadata[s].count()**.5)
         self.dataRecords.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means'])
-        self.dynamic_metadata.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['dynamic_metadata'])
+        
+        if self.ini['Monitor']['in_biomet_file'] != '':
+            # Assumes using only one timestamp column in biomet.  EP does support multiple timestamp columns so could implement a more generic solution
+            self.bm = pd.read_csv(self.ini['Paths']['biomet_data'],parse_dates=[self.ini['biom_timestamp']['name']],date_format=self.ini['biom_timestamp']['format'],index_col=self.ini['biom_timestamp']['name'],skiprows=[1])
+            for param in self.ini['Monitor']['in_biomet_file'].split(','):
+                ow = self.bm.loc[self.bm.index.isin(self.dynamic_metadata.index),param]
+                self.dynamic_metadata.loc[self.dynamic_metadata.index.isin(ow.index),param] = ow
+        self.dynamic_metadata['date'] = self.dynamic_metadata.index.strftime('%Y-%m-%d')
+        self.dynamic_metadata['time'] = self.dynamic_metadata.index.strftime('%H:%M')
+        dyn = ['date','time']+dyn
+        self.dynamic_metadata[dyn].to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['dynamic_metadata'],index=False)
         self.site_setup.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['site_setup'])
         self.Calibration.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
         self.GroupRuns()

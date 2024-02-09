@@ -57,6 +57,9 @@ class progressbar():
         self.i+=step_size
         self.show(self.i)
 
+    def close(self):
+        print('\n')
+
 
 # Logs exceptions and configuration changes that come up during pre-processing
 class EventLog():

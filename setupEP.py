@@ -60,6 +60,8 @@ class makeRun():
         self.output_path = sub_path(self,self.ini['Paths']['eddypro_output']) 
         self.raw_path = sub_path(self,self.ini['Paths']['raw'])
         if os.path.isdir(self.output_path):
+            if len(os.listdir(self.output_path)) >= 0:
+                input("Warning: Output directory is not empty.  Move files before running or they will be deleted.  Press any key to continue:")
             shutil.rmtree(self.output_path)
         os.makedirs(self.output_path)
         batch_path = self.output_path+'EP_Batch_Logs/'
@@ -76,7 +78,6 @@ class makeRun():
         if len(Metadata_Files_in_Range)>1:
             print(f"Splitting into {len(Metadata_Files_in_Range)} batches due to update metadata")
         for i,(Metadata_File,search_pattern) in enumerate(Metadata_Files_in_Range):
-            print(Metadata_File,search_pattern)
             sub_subset = Subset_Inventory.loc[((Subset_Inventory['MetaDataFile']==Metadata_File)&(Subset_Inventory['name_pattern']==search_pattern))]
             Range_index = sub_subset.index
             step = np.floor(Range_index.size/self.Processes)
@@ -96,38 +97,38 @@ class makeRun():
                 pr_end_time = str(run_ix[-1].time())[:5]
                 self.Year = run_ix[-1].year
                 # print(sub_subset.shape)
-                print(sub_subset.loc[((sub_subset.index>run_ix[0])&(sub_subset.index<run_ix[-1]))].index.size)
+                if sub_subset.loc[((sub_subset.index>run_ix[0])&(sub_subset.index<run_ix[-1]))].index.size>0:
             
-                # Copy the metadata to the output location
-                shutil.copy2(self.ini['Paths']['meta_dir']+Metadata_File,batch_path+Metadata_File)
-                
-                # Name the run
-                start_str = run_ix[0].strftime('%Y-%m-%dT%H%M')
-                end_str = run_ix[-1].strftime('%Y-%m-%dT%H%M')
-                project_id = f'{self.name}_{start_str}_{end_str}_{i}'
-                file_name = f'{batch_path}{project_id}.eddypro'
+                    # Copy the metadata to the output location
+                    shutil.copy2(self.ini['Paths']['meta_dir']+Metadata_File,batch_path+Metadata_File)
+                    
+                    # Name the run
+                    start_str = run_ix[0].strftime('%Y-%m-%dT%H%M')
+                    end_str = run_ix[-1].strftime('%Y-%m-%dT%H%M')
+                    project_id = f'{self.name}_{start_str}_{end_str}_{i}'
+                    file_name = f'{batch_path}{project_id}.eddypro'
 
-                # Grab the Eddypro input template from preprocessing associated with the metadata file
-                EddyProColumnUpdate = Metadata_File.replace('.metadata','.eddypro')
-                self.epDataCols.read(self.ini['Paths']['meta_dir']+EddyProColumnUpdate)
-                # Dump the template values in to the run file
-                for section in self.epDataCols.keys(): 
-                    for key,value in self.epDataCols[section].items():
-                        self.epRun[section][key]=value
+                    # Grab the Eddypro input template from preprocessing associated with the metadata file
+                    EddyProColumnUpdate = Metadata_File.replace('.metadata','.eddypro')
+                    self.epDataCols.read(self.ini['Paths']['meta_dir']+EddyProColumnUpdate)
+                    # Dump the template values in to the run file
+                    for section in self.epDataCols.keys(): 
+                        for key,value in self.epDataCols[section].items():
+                            self.epRun[section][key]=value
 
-                # Dump custom values using eval statement (see ini_files/EP_Dynamic_Updates.ini)
-                for section in self.epUpdate.keys():
-                    for key,value in self.epUpdate[section].items():
-                        self.epRun[section][key]=eval(value)
+                    # Dump custom values using eval statement (see ini_files/EP_Dynamic_Updates.ini)
+                    for section in self.epUpdate.keys():
+                        for key,value in self.epUpdate[section].items():
+                            self.epRun[section][key]=eval(value)
 
-                # Save the run and append to the list of runs
-                # print(file_name,search_pattern)
-                with open(file_name, 'w') as eddypro:
-                    eddypro.write(';EDDYPRO_PROCESSING\n')
-                    self.epRun.write(eddypro,space_around_delimiters=False)
-                    self.runList.append(file_name)   
-        # self.submit()
-        # self.merge_outputs()
+                    # Save the run and append to the list of runs
+                    # print(file_name,search_pattern)
+                    with open(file_name, 'w') as eddypro:
+                        eddypro.write(';EDDYPRO_PROCESSING\n')
+                        self.epRun.write(eddypro,space_around_delimiters=False)
+                        self.runList.append(file_name)   
+        self.submit()
+        self.merge_outputs()
     
     def submit(self):
         if (__name__ == 'setupEP' or __name__ == '__main__') and self.Processes > 1 and len(self.runList) > 0:
@@ -188,7 +189,7 @@ class makeRun():
 
     def merge_outputs(self):
                     
-        merge_keys = ['_fluxnet_','_full_output_','_metadata_']
+        merge_keys = ['_fluxnet_','_full_output_','_metadata_','_biomet_']
         for m in merge_keys:
             files = [f for f in os.listdir(self.output_path) if m in f]
             fullFile = pd.DataFrame()
@@ -203,7 +204,7 @@ class makeRun():
             blank = ['' for r in rep]
             rep = dict(zip(rep,blank))
             fullFile = fullFile.rename(columns=rep)
-            fullFile.to_csv(self.output_path+'eddypro_'+self.name+m+datetime.now().strftime('%Y-%m-%dT%H%M')+'_adv.csv')
+            fullFile.to_csv(self.output_path+'eddypro_'+self.name+m+datetime.now().strftime('%Y-%m-%dT%H%M')+'_adv.csv',index=False)
 
 # If called from command line ...
 if __name__ == '__main__':
