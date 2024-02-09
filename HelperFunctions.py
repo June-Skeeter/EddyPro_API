@@ -33,6 +33,9 @@ def sub_path(class_object,path_string):
     else:
         path_string = path_string.replace('DATE','')
     
+    path_string = path_string.replace('//','/')
+    path_string = path_string.replace('\\\\','\\')
+
     return(path_string)
 
 ## Progress bar to update status of a run

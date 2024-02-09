@@ -22,12 +22,13 @@ importlib.reload(parseFile)
 
 
 class read_ALL():
-    def __init__(self,SiteID,Year,Month,processes=1,reset=0,Test=0,file_type='ghg',copy_From=None,metadata_template='None'):
+    def __init__(self,SiteID,Year,Month,processes=1,reset=0,Test=0,file_type='ghg',copy_From=None,copy_tag='',metadata_template='None'):
         self.file_type=file_type
         self.Year = str(Year)
         self.Month = "{:02d}".format(Month)
         self.SiteID = SiteID
         self.copy_From = copy_From
+        self.copy_tag = copy_tag
 
         # Concatenate and read the ini files
         inis = ['configuration.ini','Metadata_Instructions.ini']
@@ -99,6 +100,8 @@ class read_ALL():
             for i,row in df.loc[((df['Flag']=='Incomplete Record')&(~df['filename'].str.contains('_incomplete')))].iterrows():
                 old_fn = row['filename']
                 new_fn = df.loc[df.index==i,'filename']=old_fn.split('.')[0]+'_incomplete.'+old_fn.split('.')[1]
+                if os.path.isfile(f"{self.ini['Paths']['dpath']}/{new_fn}"):
+                    os.remove(f"{self.ini['Paths']['dpath']}/{new_fn}")
                 os.rename(f"{self.ini['Paths']['dpath']}/{old_fn}",f"{self.ini['Paths']['dpath']}/{new_fn}")
                 
             # Resample to get timestamp on consistent half-hourly intervals
@@ -116,15 +119,17 @@ class read_ALL():
         else:
             print(f"Not a valid directory: {self.ini['Paths']['dpath']}")
 
-    def setup(self,path_in,path_out,date_format):
-        for _, _, files in os.walk(path_in):
+    def setup(self):
+        for dir, _, files in os.walk(self.copy_From):
+            pb = progressbar(len(files),'Copying Files')
             for file in files:
-                if file.endswith(self.file_type):
+                pb.step()
+                if file.endswith(self.file_type) and self.copy_tag in file and os.path.isfile(f"{self.ini['Paths']['dpath']}/{file}") == False:
                     srch = re.search(self.ini[self.file_type]['search'], file).group(0)
                     if srch is not None:
-                        TIMESTAMP =  datetime.strptime(srch.group(0),date_format)
-                        if TIMESTAMP.year == self.Year and str(TIMESTAMP.month).zfill(2) == self.Month:
-                            shutil.copy(f"{self.copy_From}/{file}",f"{self.ini['Paths']['dpath']}/{file}")
+                        TIMESTAMP =  datetime.strptime(srch,self.ini[self.file_type]['format'])
+                        if str(TIMESTAMP.year) == self.Year and str(TIMESTAMP.month).zfill(2) == self.Month:
+                            shutil.copy(f"{dir}/{file}",f"{self.ini['Paths']['dpath']}/{file}")
 
 
     def makeEmpty(self,type='object',ixName='TIMESTAMP'):
@@ -179,7 +184,6 @@ class read_ALL():
                 for fn,ts in zip(NameList,TimeList):
                     out = self.Parser.process_file([fn,ts],Testing=True)
                     self.appendRecs(out)
-                    # pb.step()
                     self.out = out
 
             self.prepareOutputs()        
