@@ -28,8 +28,8 @@ class Parse():
         self.Vars = configparser.ConfigParser()
         self.Vars.read_file(open(self.ini['templates']['VariableList']))
 
-        if self.ini['templates']['UpdateMetadata'] != '':
-            self.UpdateMetadata = pd.read_csv('ini_files/BB_Metadata_Updates.csv',parse_dates={'Start':['TIMESTAMP_Start'],'End':['TIMESTAMP_End']})
+        if os.path.isfile(self.ini['filenames']['metadata_to_overwrite']):
+            self.UpdateMetadata = pd.read_csv(self.ini['filenames']['metadata_to_overwrite'],parse_dates={'Start':['TIMESTAMP_Start'],'End':['TIMESTAMP_End']})
             self.UpdateMetadata['End']=self.UpdateMetadata['End'].fillna(pd.to_datetime(datetime.datetime.now()).ceil('H'))
             self.UpdateMetadata.reset_index(inplace=True)
             self.UpdateMetadata.set_index(['Start','End','index'],inplace=True)
@@ -49,22 +49,17 @@ class Parse():
 
     def process_file(self,input,Template_File=True,Testing=False):
         self.Template_File_Available = Template_File
-
-        name = input[0]
+        self.filename = input[0]
         self.TimeStamp = input[1]
-        self.fullFile = self.ini['Paths']['dpath']+'/'+name
-        _, self.file_type = name.rsplit('.',1)
+        self.fullFile = self.ini['Paths']['dpath']+'/'+self.filename
+        self.filename, self.file_type = self.filename.rsplit('.',1)
         if self.file_type == 'ghg':
             with zipfile.ZipFile(self.fullFile, 'r') as ghgZip:
                 self.whichFiles(ghgZip.namelist())
-                
                 self.Template_File_Available = self.Parse_Metadata(TextIOWrapper(ghgZip.open(self.ghgFiles['metadata']), 'utf-8'),self.Template_File_Available)
-                
                 if ~hasattr(self, 'data_columns'):
                     self.readHeader(ghgZip.open(self.ghgFiles['data']))
-
                 self.read_dat(ghgZip.open(self.ghgFiles['data']))
-
                 # Read the calibration config data (only do one per day for expedience)
                 if self.ini['Calibration_Info']['read_Cal'] == 'True' and (self.TimeStamp.strftime('%H:%M') == '00:00' or Testing == True):
                     if len(self.ghgFiles['system_config']['xmlFiles'])>0:
@@ -78,8 +73,8 @@ class Parse():
 
             self.EV.cleanLog(self.TimeStamp)
         else:
-            print('.dat file procedures not yet fully')
-            templateFiles = [path for path in Path(self.ini['Paths']['dpath']).rglob("*.metadata")]
+            templateFiles = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*.metadata")]
+            templateFiles.sort()
             self.Parse_Metadata(open(templateFiles[-1]),self.Template_File_Available)
             self.readHeader(self.fullFile)
             self.read_dat(self.fullFile)
@@ -103,7 +98,6 @@ class Parse():
                 head = f.readlines()
                 self.data_columns = np.array(head[int(self.Metadata['FileDescription']['header_rows'])-3].replace('"', '').replace('\n','').split(self.delimiter))
                 self.data_units = np.array(head[int(self.Metadata['FileDescription']['header_rows'])-2].replace('"', '').replace('\n','').split(self.delimiter))
-
         # Assumes site is running one 7200 or 7550, not both or multiples.  May need to implement more nuanced process if site has multiple co2 analyzers
 
         if '72' in self.Metadata['Instruments']['instr_2_model']:
@@ -121,29 +115,22 @@ class Parse():
                         break
 
     def read_dat(self,file):
-        # with file as f:
         Data = pd.read_csv(file,delimiter=self.delimiter,skiprows=int(self.Metadata['FileDescription']['header_rows']),header=None)
         Data.columns = self.data_columns
         self.dataValues['n_samples'] = Data.shape[0]
         for key,val in self.Variable_Names.items():
-            if 'diag' in key:
-                self.getStats(Data,key,'max')
-            else:
-                self.getStats(Data,key)
-            if key == 'sos':
-                #  Sonic Virtual Temp, eq 9 pg C-2: https://s.campbellsci.com/documents/ca/manuals/csat3_man.pdf
-                Data['t_sonic'] = (Data[key]**2/(1.4*287.04))
-                self.getStats(Data,'t_sonic')
-        # print(self.TimeStamp)
-        # print(self.dataValues['t_sonic'])
-        # Data['w_prime']=Data['w']-Data['w'].mean()
-        # p_bar=Data['col_air_p'].mean()
+            if key in self.data_columns:
+                Data[key]=pd.to_numeric(Data[key],errors='coerce')
+                if 'diag' in key:
+                    self.getStats(Data,key,'max')
+                else:
+                    self.getStats(Data,key)
+                if key == 'sos':
+                    #  Sonic Virtual Temp, eq 9 pg C-2: https://s.campbellsci.com/documents/ca/manuals/csat3_man.pdf
+                    Data['t_sonic'] = (Data[key]**2/(1.4*287.04))
+                    self.getStats(Data,'t_sonic')
         for key,val in self.Vars['Custom'].items():
             self.dataValues[key]=eval(val)
-        #     Data[f'{key}_prime'] = Data[key]-Data[key].mean()
-        #     Flux = p_bar*(Data['w_prime']*Data[f'{key}_prime']).mean()
-        #     print('Raw ',flux,' ',Flux)
-
         if self.Template_File_Available is False:
             self.Write_EP_Template(Data.columns)              
               
@@ -154,21 +141,19 @@ class Parse():
 
         self.Metadata.read_file(meta_file)
 
-        if self.ini['templates']['UpdateMetadata'] != '':
+        if hasattr(self, 'UpdateMetadata'):
             Start = self.UpdateMetadata.index.get_level_values('Start')
             End = self.UpdateMetadata.index.get_level_values('End')
             To_update = self.UpdateMetadata.loc[((Start<=self.TimeStamp)&(End>=self.TimeStamp))]
-            cid = ''
-            for ix,row in To_update.iterrows():
+            for _,row in To_update.iterrows():
                 columns = row.dropna().index
                 values = row.dropna()
                 for col,cel in zip(columns,values):
                     self.Metadata[col.split(' ')[0]][col.split(' ')[1]]=str(cel)
         
-        templateList = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*_{self.Metadata['Station']['logger_id']}.metadata")]
+        templateList = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*.metadata")]
         templateList.sort()
-        templateFiles=[templateList[i] for i in range(len(templateList)) if os.path.basename(templateList[i]) < meta_file.name]
-
+        templateFiles=[templateList[i] for i in range(len(templateList)) if os.path.basename(templateList[i]) <= os.path.basename(meta_file.name)]
 
         if len(templateFiles)<1:
             MetadataTemplate_File = False
@@ -177,9 +162,9 @@ class Parse():
             self.MetadataTemplate.read_file(open(templateFiles[-1]))
             MetadataTemplate_File=self.check_values(MetadataTemplate_File)
             
-        if MetadataTemplate_File is False:    
+        if MetadataTemplate_File is False:
             self.MetadataTemplate.read_dict(self.Metadata)
-            filename = f"{self.TimeStamp.strftime('%Y-%m-%dT%H%M%S')}_{self.Metadata['Station']['logger_id']}.metadata"
+            filename = f"{self.filename}.metadata"
             self.Metadata_Filename = filename
             MetadataTemplate_File=self.check_values(MetadataTemplate_File)
                     
@@ -189,14 +174,17 @@ class Parse():
         else:
             self.Metadata_Filename = os.path.basename(templateFiles[-1])
         self.delimiter = self.ini['delimiter_key'][self.Metadata['FileDescription']['separator']].encode('ascii','ignore').decode('unicode_escape')
-
+        
         return(MetadataTemplate_File)
     
     def check_values(self,MetadataTemplate_File):
         for section,values in self.MetadataTemplate.items():
             for key in values.keys():
                 if key in self.ini['Monitor']['site_setup'].split(','):
-                    self.dataValues[key] = float(self.Metadata[section][key])
+                    try:
+                        self.dataValues[key] = float(self.Metadata[section][key])
+                    except:
+                        self.dataValues[key] = np.nan
                     # Overwrite any values from the correction
                     if self.Metadata[section][key]!=self.MetadataTemplate[section][key]:
                         self.EV.updateLog(f'Setup {key}',self.Metadata[section][key],self.TimeStamp)
@@ -215,27 +203,25 @@ class Parse():
         self.EddyProTemplate = configparser.ConfigParser()
         for v in ['Project','RawProcess_BiometMeasurements']:
             self.EddyProTemplate.add_section(v)
-        # print(cols)
+        if self.file_type=='ghg':
+            self.EddyProTemplate['Project']['file_type']='0'
+        else:
+            self.EddyProTemplate['Project']['file_type']='1'
         for key,value in self.Vars['Project'].items():
             # for var in value.split(','):
             col_num = np.where(cols==key)[0]
             if len(col_num) == 0:
                 channel = 0
-            # elif (('72' in self.Metadata['Instruments']['instr_2_model']) or ('72' in self.Metadata['Instruments']['instr_3_model'])) and key == 'col_diag_75':
-            #     channel = 0
-            #     print(self.Metadata['Instruments']['instr_2_model'],key)
-            # elif (('75' in self.Metadata['Instruments']['instr_2_model']) or ('75' in self.Metadata['Instruments']['instr_3_model'])) and key == 'col_diag_72':
-            #     channel = 0
-            #     print(self.Metadata['Instruments']['instr_2_model'],key)
             elif len(col_num)>1:
                 # haven't encountered yet - just a catch to crash the program in case it happens
                 warning = f'Warning! Duplicate Channel {key} in Column Headers'
                 sys.exit(warning)
             else:
                 channel = int(col_num[0])
+                if self.file_type != 'ghg':
+                    channel += 1
                 # break
             self.EddyProTemplate['Project'][key] = str(channel)
-            # print(key,self.EddyProTemplate['Project'][key])
 
         for key,value in self.Vars['RawProcess_BiometMeasurements'].items():
             match = [i for i in range(len(self.biometTraces)) if self.biometTraces[i] == value]
@@ -243,7 +229,7 @@ class Parse():
                 bm_ix = match[0]+1
                 self.EddyProTemplate['RawProcess_BiometMeasurements'][key] = str(bm_ix)
 
-        with open(f"{self.ini['Paths']['meta_dir']}{self.TimeStamp.strftime('%Y-%m-%dT%H%M%S')}_{self.Metadata['Station']['logger_id']}.eddypro", 'w') as eddypro:
+        with open(f"{self.ini['Paths']['meta_dir']}{self.filename}.eddypro", 'w') as eddypro:
             eddypro.write(';EDDYPRO_PROCESSING\n')
             self.EddyProTemplate.write(eddypro,space_around_delimiters=False)
 
@@ -276,9 +262,9 @@ class Parse():
     def getStats(self,tbl,rec,stat='mean'):
         try:
             if stat == 'mean':
-                self.dataValues[rec] = tbl[rec].mean()
+                self.dataValues[rec] = tbl[rec].astype('float').mean()
             elif stat == 'max':
-                self.dataValues[rec] = tbl[rec].max()
+                self.dataValues[rec] = tbl[rec].astype('float').max()
         except:
             self.EV.errorLog('Missing Data Value',rec,self.TimeStamp)
             pass

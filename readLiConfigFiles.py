@@ -2,9 +2,8 @@ import re
 import json
 import numpy as np
 import configparser
-import eventLog as el
 import pandas as pd
-
+from HelperFunctions import EventLog as eL
 
 def getTime(Time,fmt = 'epoch'):
     try:
