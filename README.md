@@ -4,9 +4,15 @@ Created by Dr. June Skeeter
 
 This project is still under development.
 
-## About
+# About
 
-This API is intended to streamline flux estimation using Eddy Pro.  The API allows you to run EddyPro in parallel batches to speed up processing.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI
+This API is intended to streamline flux estimation using Eddy Pro.  The API allows you to run EddyPro in parallel, high-priority batches to mininmize computation times.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI.
+
+## Intro
+
+Eddy Covariance is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses (e.g., CO_2).  Flux esimation via Eddy Covariance involves applying a Reynolds Opperator to high frequency (>=10 Hz) measurements of gas conentrations and turubelence conditions over 30- to 60-minute intervals.
+
+Processing, and reprocessing of Eddy Covariance (EC) data is a time consiuming process
 
 ## For Winmet
 

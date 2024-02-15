@@ -126,7 +126,8 @@ class makeRun():
                     with open(file_name, 'w') as eddypro:
                         eddypro.write(';EDDYPRO_PROCESSING\n')
                         self.epRun.write(eddypro,space_around_delimiters=False)
-                        self.runList.append(file_name)   
+                        self.runList.append(file_name) 
+          
         self.submit()
         self.merge_outputs()
     
@@ -176,7 +177,8 @@ class makeRun():
             with open(batchFile, 'w') as batch:
                 contents = f'cd {bin}'
                 P = self.priority.lower().replace(' ','')
-                contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
+                # contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
+                contents+=f'\nSTART powershell  ".\\'+self.ini['filenames']['eddypro_rp']+' | tee processing_log.txt"'
                 contents+='\nping 127.0.0.1 -n 6 > nul'
                 contents+=f'\nwmic process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{self.priority}"'
                 contents+='\nping 127.0.0.1 -n 6 > nul'
