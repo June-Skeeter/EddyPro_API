@@ -10,9 +10,11 @@ This API is intended to streamline flux estimation using Eddy Pro.  The API allo
 
 ## Intro
 
-Eddy Covariance is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses (e.g., CO_2).  Flux esimation via Eddy Covariance involves applying a Reynolds Opperator to high frequency (>=10 Hz) measurements of gas conentrations and turubelence conditions over 30- to 60-minute intervals.
+Eddy Covariance (EC) is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses (e.g., CO_2).  Flux esimation via EC involves applying a Reynolds Opperators to high frequency (>=10 Hz) measurements of scalar conentrations and 3D winds over 30- to 60-minute intervals.  This is a computationally expensive procedure, and when it must be repeated over months or years of data, it quickly becomes an incredibly time consuming procedure.
 
-Processing, and reprocessing of Eddy Covariance (EC) data is a time consiuming process
+One of the most popular applications for processing EC data is EddyPro (LICOR).  "EddyPro is designed to provide easy, accurate EC flux computations." [see](https://www.licor.com/env/support/EddyPro/topics/introduction.html#top)  The application has a graphic user interface (GUI) that allows apply a standard processing pipeline or selectively apply more advanced filtering and correction procedures as needed.  The backend of the processing routine is then executed in FORTRAN, and eddypro outputs fluxes estimates and supplemental data as .csv files.
+
+The EddyPro API (Application Program Interfae) is a python wrapper for the EddyPro GUI that allows for automation of flux processing procedures defined usising the EddyPro GUI, and more rapid processing of EC data via paralell processing.
 
 ## For Winmet
 
