@@ -4,10 +4,22 @@ Created by Dr. June Skeeter
 
 This project is still under development.
 
-## About
+# About
 
-This API is intended to streamline flux estimation using Eddy Pro.  The API allows you to run EddyPro in parallel batches to speed up processing.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI
+This API is intended to streamline flux estimation using Eddy Pro.  The API allows you to run EddyPro in parallel, high-priority batches to mininmize computation times.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI.
 
+## Intro
+
+Eddy Covariance (EC) is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses (e.g., CO_2).  Flux esimation via EC involves applying a Reynolds Opperators to high frequency (>=10 Hz) measurements of scalar conentrations and 3D winds over 30- to 60-minute intervals.  This is a computationally expensive procedure, and when it must be repeated over months or years of data, it quickly becomes an incredibly time consuming procedure.
+
+One of the most popular applications for processing EC data is EddyPro (LICOR).  "EddyPro is designed to provide easy, accurate EC flux computations." [see](https://www.licor.com/env/support/EddyPro/topics/introduction.html#top)  The application has a graphic user interface (GUI) that allows apply a standard processing pipeline or selectively apply more advanced filtering and correction procedures as needed.  The backend of the processing routine is then executed in FORTRAN, and eddypro outputs fluxes estimates and supplemental data as .csv files.
+
+The EddyPro API (Application Program Interfae) is a python wrapper for the EddyPro GUI that allows for automation of flux processing procedures defined usising the EddyPro GUI, and more rapid processing of EC data via paralell processing.
+
+## For Winmet
+
+> Set-ExecutionPolicy Unrestricted -Scope Process
+> PS C:\Users\labuser\EddyPro_API\.venv\Scripts> .\Activate.ps1
 
 ## Workflow
 

@@ -201,8 +201,25 @@ class Parse():
 
     def Write_EP_Template(self,cols):
         self.EddyProTemplate = configparser.ConfigParser()
-        for v in ['Project','RawProcess_BiometMeasurements']:
+        for v in ['Project','RawProcess_BiometMeasurements','RawProcess_WindDirectionFilter']:
             self.EddyProTemplate.add_section(v)
+        self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_apply']='1'
+        
+        bearing = float(self.Metadata['Instruments']['instr_1_north_offset'])
+        width = float(self.ini['Wind_Filter']['width'])
+        mn_mx = [bearing+180-width,bearing+180+width]
+        if mn_mx[0] <= 360 and mn_mx[1] <= 360:
+            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_start']=str(mn_mx[0])
+            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_end']=str(mn_mx[1])
+        elif mn_mx[0] > 360 and mn_mx[1] > 360:
+            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_start']=str(mn_mx[0]-360)
+            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_end']=str(mn_mx[1]-360)
+        else:
+            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_start']=str(mn_mx[0])
+            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_end']=str(360)
+            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_2_start']=str(0)
+            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_2_end']=str(mn_mx[1]-360)
+
         if self.file_type=='ghg':
             self.EddyProTemplate['Project']['file_type']='0'
         else:
@@ -228,6 +245,7 @@ class Parse():
             if len(match)==1:
                 bm_ix = match[0]+1
                 self.EddyProTemplate['RawProcess_BiometMeasurements'][key] = str(bm_ix)
+
 
         with open(f"{self.ini['Paths']['meta_dir']}{self.filename}.eddypro", 'w') as eddypro:
             eddypro.write(';EDDYPRO_PROCESSING\n')

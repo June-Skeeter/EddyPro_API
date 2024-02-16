@@ -76,7 +76,7 @@ class read_ALL():
         name_pattern = []
         if self.copy_From is not None:
             if os.path.isdir(self.ini['Paths']['dpath']) == False:
-                os.mkdir(self.ini['Paths']['dpath'])
+                os.makedirs(self.ini['Paths']['dpath'])
             self.setup()
         if os.path.isdir(self.ini['Paths']['dpath']):
             for file in os.listdir(self.ini['Paths']['dpath']):

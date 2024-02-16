@@ -23,7 +23,7 @@ class makeRun():
 
     def __init__(self,template_file,SiteID,name='EddyPro_API_Run',testing=False,Processes = 2,priority = 'normal'):
         self.priority = priority
-        self.Processes = Processes
+        self.nProcesses = Processes
         self.name = f"{name}_{SiteID}"
 
         self.DeBug = testing
@@ -74,18 +74,20 @@ class makeRun():
         Subset_Inventory = self.inventory.loc[((self.inventory.index>=Range_index[0])&(self.inventory.index<=Range_index[1]))].copy()
         Metadata_Files_in_Range = Subset_Inventory.groupby(['MetaDataFile','name_pattern']).first().index.values
         
-        # Each unique (based on metadata files) time period within the range index will be split by the number of self.Processes
+        # Each unique (based on metadata files) time period within the range index will be split by the number of Processes
         if len(Metadata_Files_in_Range)>1:
             print(f"Splitting into {len(Metadata_Files_in_Range)} batches due to update metadata")
         for i,(Metadata_File,search_pattern) in enumerate(Metadata_Files_in_Range):
             sub_subset = Subset_Inventory.loc[((Subset_Inventory['MetaDataFile']==Metadata_File)&(Subset_Inventory['name_pattern']==search_pattern))]
             Range_index = sub_subset.index
+            self.Processes=self.nProcesses
             step = np.floor(Range_index.size/self.Processes)
             if step <= self.Processes:
-                print(f"Insufficient number of files in batch for multiprocessing")
-                self.Processes = 1
-                step = np.floor(Range_index.size/self.Processes)
-            for j,ix in enumerate([[int(k*step),int(k*step+step)] for k in range(self.Processes)]):
+                step = np.floor(Range_index.size/1)
+                nsteps=1
+            else:
+                nsteps=self.Processes
+            for j,ix in enumerate([[int(k*step),int(k*step+step)] for k in range(nsteps)]):
                 if j<self.Processes-1:
                     run_ix = Range_index[ix[0]:ix[1]]
                 else: # Final thread will play cleanup and get any extra runs
@@ -97,7 +99,7 @@ class makeRun():
                 pr_end_time = str(run_ix[-1].time())[:5]
                 self.Year = run_ix[-1].year
                 # print(sub_subset.shape)
-                if sub_subset.loc[((sub_subset.index>run_ix[0])&(sub_subset.index<run_ix[-1]))].index.size>0:
+                if sub_subset.loc[((sub_subset.index>=run_ix[0])&(sub_subset.index<=run_ix[-1]))].index.size>0:
             
                     # Copy the metadata to the output location
                     shutil.copy2(self.ini['Paths']['meta_dir']+Metadata_File,batch_path+Metadata_File)
@@ -122,16 +124,18 @@ class makeRun():
                             self.epRun[section][key]=eval(value)
 
                     # Save the run and append to the list of runs
-                    # print(file_name,search_pattern)
                     with open(file_name, 'w') as eddypro:
                         eddypro.write(';EDDYPRO_PROCESSING\n')
                         self.epRun.write(eddypro,space_around_delimiters=False)
-                        self.runList.append(file_name)   
+                        self.runList.append(file_name) 
+          
         self.submit()
         self.merge_outputs()
     
     def submit(self):
-        if (__name__ == 'setupEP' or __name__ == '__main__') and self.Processes > 1 and len(self.runList) > 0:
+        if len(self.runList) < self.Processes:
+            self.Processes = len(self.runList)
+        if (__name__ == 'setupEP' or __name__ == '__main__') and self.Processes > 1:
             with Pool(processes=self.Processes) as pool:
                 self.Processes = multiprocessing.active_children()
                 
@@ -146,7 +150,8 @@ class makeRun():
                     with open(batchFile, 'w') as batch:                        
                         contents = f'cd {bin}'
                         P = self.priority.lower().replace(' ','')
-                        contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
+                        # contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
+                        contents+=f'\nSTART powershell  ".\\'+self.ini['filenames']['eddypro_rp']+' | tee processing_log.txt"'
                         contents+='\nping 127.0.0.1 -n 6 > nul'
                         contents+=f'\nwmic process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{self.priority}"'
                         contents+='\nping 127.0.0.1 -n 6 > nul'
@@ -161,7 +166,7 @@ class makeRun():
                     shutil.rmtree(os.getcwd()+f'/temp/{thread.pid}')
 
                 pool.close()
-        else:
+        elif len(self.runList)>0:
             cwd = os.getcwd()
             bin = cwd+f'/temp/{os.getpid()}/bin/'
             ini = cwd+f'/temp/{os.getpid()}/ini/'
@@ -175,7 +180,8 @@ class makeRun():
             with open(batchFile, 'w') as batch:
                 contents = f'cd {bin}'
                 P = self.priority.lower().replace(' ','')
-                contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
+                # contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
+                contents+=f'\nSTART powershell  ".\\'+self.ini['filenames']['eddypro_rp']+' | tee processing_log.txt"'
                 contents+='\nping 127.0.0.1 -n 6 > nul'
                 contents+=f'\nwmic process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{self.priority}"'
                 contents+='\nping 127.0.0.1 -n 6 > nul'
@@ -262,9 +268,9 @@ if __name__ == '__main__':
     args = CLI.parse_args()
 
 
-    print(f'Initializing {args.Name} run for {args.SiteID} with {args.self.Processes} processes at {args.Priority} self.priority level')
+    print(f'Initializing {args.Name} run for {args.SiteID} with {args.Processes} processes at {args.Priority} self.priority level')
     
-    mR = makeRun(args.Template,args.SiteID,args.self.Processes,args.Priority)
+    mR = makeRun(args.Template,args.SiteID,args.Processes,args.Priority)
 
     for start,end in zip(args.RunDates[::2],args.RunDates[1::2]):
         t1 = time.time()
