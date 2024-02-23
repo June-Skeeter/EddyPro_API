@@ -7,31 +7,42 @@ import pandas as pd
 
 def sub_path(class_object,path_string):
 
+    sub_patterns = ['read_data_dir','write_data_dir','year','month','siteID','dateStr','name']
+    for sub in sub_patterns:
+        if hasattr(class_object, sub):
+            path_string = path_string.replace(f'**{sub}**',str(class_object.__getattribute__(sub))).replace('None','')
+        else:
+            path_string = path_string.replace(f'**{sub}**','')
     
-    if hasattr(class_object, 'Root'):
-        path_string = path_string.replace('ROOT_PATH',str(class_object.Root))
-    else:
-        path_string = path_string.replace('ROOT_PATH','')
+    # if hasattr(class_object, 'read_data_dir'):
+    #     path_string = path_string.replace('read_data_dir',str(class_object.read_data_dir))
+    # else:
+    #     path_string = path_string.replace('read_data_dir','')
+        
+    # if hasattr(class_object, 'write_data_dir'):
+    #     path_string = path_string.replace('write_data_dir',str(class_object.write_data_dir))
+    # else:
+    #     path_string = path_string.replace('write_data_dir','')
 
-    if hasattr(class_object, 'Year'):
-        path_string = path_string.replace('YEAR',str(class_object.Year))
-    else:
-        path_string = path_string.replace('YEAR','')
+    # if hasattr(class_object, 'Year'):
+    #     path_string = path_string.replace('YEAR',str(class_object.Year)).replace('None','')
+    # else:
+    #     path_string = path_string.replace('YEAR','')
     
-    if hasattr(class_object, 'Month'):
-        path_string = path_string.replace('MONTH',str(class_object.Month))
-    else:
-        path_string = path_string.replace('MONTH','')
+    # if hasattr(class_object, 'Month'):
+    #     path_string = path_string.replace('MONTH',str(class_object.Month)).replace('None','')
+    # else:
+    #     path_string = path_string.replace('MONTH','')
     
-    if hasattr(class_object, 'SiteID'):
-        path_string = path_string.replace('SITEID',str(class_object.SiteID))
-    else:
-        path_string = path_string.replace('SITEID','')
+    # if hasattr(class_object, 'SiteID'):
+    #     path_string = path_string.replace('SITEID',str(class_object.SiteID)).replace('None','')
+    # else:
+    #     path_string = path_string.replace('SITEID','')
     
-    if hasattr(class_object, 'dateStr'):
-        path_string = path_string.replace('DATE',str(class_object.dateStr))
-    else:
-        path_string = path_string.replace('DATE','')
+    # if hasattr(class_object, 'dateStr'):
+    #     path_string = path_string.replace('DATE',str(class_object.dateStr)).replace('None','')
+    # else:
+    #     path_string = path_string.replace('DATE','')
     
     path_string = path_string.replace('//','/')
     path_string = path_string.replace('\\\\','\\')
