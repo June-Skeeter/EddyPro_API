@@ -71,9 +71,7 @@ Create a .eddypro template, either using the GUI, editing one of the templates i
 
 * Enhance documentation
 * Procedures for updating slices of preprocessing without re-running whole batches
-* Concatenate output files
 * Update naming conventions and handling of output files to be more organized and prevent overwriting outputs
 * Put metadata update files in more sensible (site specific) location
 * Time lag optimization
 * Cospectral analysis
-* Setup to use .dat files as well
