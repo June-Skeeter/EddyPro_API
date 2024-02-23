@@ -21,10 +21,13 @@ from HelperFunctions import progressbar, sub_path
 
 class makeRun():
 
-    def __init__(self,template_file,SiteID,name='EddyPro_API_Run',testing=False,Processes = 2,priority = 'normal'):
+    def __init__(self,template_file,siteID,name=None,testing=False,Processes = 2,priority = 'normal'):
         self.priority = priority
-        self.nProcesses = Processes
-        self.name = f"{name}_{SiteID}"
+        self.Processes = Processes
+        if name is None:
+            self.name = f"{siteID}"
+        else:
+            self.name = f"{name}_{siteID}"
 
         self.DeBug = testing
         
@@ -33,7 +36,8 @@ class makeRun():
         self.ini = configparser.ConfigParser()
         self.ini.read(ini_file)
         
-        self.SiteID = SiteID
+        self.siteID = siteID
+        # print(self.siteID)
 
         # Template file to be filled updated
         self.epRun = configparser.ConfigParser()
@@ -46,7 +50,8 @@ class makeRun():
         # Parameters to update in template
         self.epDataCols = configparser.ConfigParser()
 
-        self.Root = self.ini['Paths']['root_data_dir']
+        self.read_data_dir = self.ini['Paths']['read_data_dir']
+        self.write_data_dir = self.ini['Paths']['write_data_dir']
         self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
 
         self.inventory = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
@@ -58,7 +63,6 @@ class makeRun():
         self.epRun['Project']['project_title']=self.name
         # Simple/tidy procedure for testing - replace with more secure process that doesn't overwrite outputs
         self.output_path = sub_path(self,self.ini['Paths']['eddypro_output']) 
-        self.raw_path = sub_path(self,self.ini['Paths']['raw'])
         if os.path.isdir(self.output_path):
             if len(os.listdir(self.output_path)) >= 0:
                 input("Warning: Output directory is not empty.  Move files before running or they will be deleted.  Press any key to continue:")
@@ -80,7 +84,6 @@ class makeRun():
         for i,(Metadata_File,search_pattern) in enumerate(Metadata_Files_in_Range):
             sub_subset = Subset_Inventory.loc[((Subset_Inventory['MetaDataFile']==Metadata_File)&(Subset_Inventory['name_pattern']==search_pattern))]
             Range_index = sub_subset.index
-            self.Processes=self.nProcesses
             step = np.floor(Range_index.size/self.Processes)
             if step <= self.Processes:
                 step = np.floor(Range_index.size/1)
@@ -97,8 +100,15 @@ class makeRun():
                 pr_start_time = str(run_ix[0].time())[:5]
                 pr_end_date = str(run_ix[-1].date())
                 pr_end_time = str(run_ix[-1].time())[:5]
-                self.Year = run_ix[-1].year
-                # print(sub_subset.shape)
+                if len(run_ix.year.unique().values)>1:
+                    self.year = None
+                else:
+                    self.year = run_ix.year[0]
+                    if len(run_ix.month.unique().values)>1:
+                        self.month = None
+                    else:
+                        self.month = str(run_ix.month[0]).zfill(2)
+
                 if sub_subset.loc[((sub_subset.index>=run_ix[0])&(sub_subset.index<=run_ix[-1]))].index.size>0:
             
                     # Copy the metadata to the output location
@@ -196,21 +206,27 @@ class makeRun():
     def merge_outputs(self):
                     
         merge_keys = ['_fluxnet_','_full_output_','_metadata_','_biomet_']
-        for m in merge_keys:
-            files = [f for f in os.listdir(self.output_path) if m in f]
+        main_header_col = [0,1,0,0]
+        head_length = [1,3,1,2]
+        self.all_outputs = {}
+        for m,h,hl in zip(merge_keys,main_header_col,head_length):
+            files = [f for f in os.listdir(self.output_path) if (m in f and f.endswith('.csv'))]
             fullFile = pd.DataFrame()
             for i,f in enumerate(files):
-                if i == 0:
-                    fullFile = pd.read_csv(self.output_path+f)
-                else:
-                    fullFile = pd.concat([fullFile,pd.read_csv(self.output_path+f)],ignore_index=True)
-                os.remove(self.output_path+f)
-            fullFile = fullFile.loc[fullFile.duplicated()==False]
-            rep = fullFile.columns[fullFile.columns.str.contains('Unnamed')]
-            blank = ['' for r in rep]
-            rep = dict(zip(rep,blank))
-            fullFile = fullFile.rename(columns=rep)
-            fullFile.to_csv(self.output_path+'eddypro_'+self.name+m+datetime.now().strftime('%Y-%m-%dT%H%M')+'_adv.csv',index=False)
+                df = pd.read_csv(self.output_path+f,header=None,keep_default_na=False)
+                while df.loc[h].duplicated().sum()>0:
+                    # Eddy pro can potentially output "duplicate" mean values: eg., two columns labelled "air_p_mean"
+                    ix = df.loc[h].duplicated()
+                    df.loc[h,ix]+='_alt'
+                # set the first hl rows as columns
+                df.columns=pd.MultiIndex.from_arrays(df.iloc[0:hl].values)
+                # delete the first three rows (because they are also the columns)
+                df=df.iloc[hl:]
+                fullFile = pd.concat([fullFile,df],axis=0,sort=False)
+                fullFile.sort_values(by=fullFile.columns[0])
+            fn = self.output_path+'eddypro_'+self.name+m+datetime.now().strftime('%Y-%m-%dT%H%M')+'_adv.csv'
+            fullFile.to_csv(fn,index=False)
+            self.all_outputs[m.replace('_','')]=fn
 
 # If called from command line ...
 if __name__ == '__main__':
@@ -223,7 +239,7 @@ if __name__ == '__main__':
     CLI=argparse.ArgumentParser()
     
     CLI.add_argument(
-    "--SiteID", 
+    "--siteID", 
     nargs="?",# Use "?" to limit to one argument instead of list of arguments
     type=str,
     default='BB',
@@ -268,14 +284,14 @@ if __name__ == '__main__':
     args = CLI.parse_args()
 
 
-    print(f'Initializing {args.Name} run for {args.SiteID} with {args.Processes} processes at {args.Priority} self.priority level')
+    print(f'Initializing {args.Name} run for {args.siteID} with {args.Processes} processes at {args.Priority} self.priority level')
     
-    mR = makeRun(args.Template,args.SiteID,args.Processes,args.Priority)
+    mR = makeRun(args.Template,args.siteID,args.Processes,args.Priority)
 
     for start,end in zip(args.RunDates[::2],args.RunDates[1::2]):
         t1 = time.time()
         print(f'Processing date range {start} - {end}')
         print(args.Name)
-        mR.runDates([start,end],args.Name)
+        self.runDates([start,end],args.Name)
         print(f'Completed in: {np.round(time.time()-t1,4)} seconds')
 
