@@ -34,11 +34,6 @@ class Parse():
             self.UpdateMetadata.reset_index(inplace=True)
             self.UpdateMetadata.set_index(['Start','End','index'],inplace=True)
 
-        self.Metadata = configparser.ConfigParser()
-        self.MetadataTemplate = configparser.ConfigParser()
-
-        self.Header = configparser.ConfigParser()                
-
         biometData = pd.read_csv(self.ini['Paths']['biomet_data'])
         self.biometTraces = biometData.columns
         
@@ -134,13 +129,14 @@ class Parse():
         if self.Template_File_Available is False:
             self.Write_EP_Template(Data.columns)              
               
-    def Parse_Metadata(self,meta_file,MetadataTemplate_File):
+    def Parse_Metadata(self,meta_file,MetadataTemplate_File):  
         # Look for changes in the metadata file and return new metadata template file for each update
         # Correct metadata where necessary (e.g., undocumented orientation change)
         # See ini_files/Metadata_Instructions.ini for metadata varialbes bing 
-
+        
+        self.Metadata = configparser.ConfigParser()
         self.Metadata.read_file(meta_file)
-
+        
         if hasattr(self, 'UpdateMetadata'):
             Start = self.UpdateMetadata.index.get_level_values('Start')
             End = self.UpdateMetadata.index.get_level_values('End')
@@ -159,10 +155,13 @@ class Parse():
             MetadataTemplate_File = False
             
         if MetadataTemplate_File is True:
+            self.MetadataTemplate = configparser.ConfigParser()
             self.MetadataTemplate.read_file(open(templateFiles[-1]))
             MetadataTemplate_File=self.check_values(MetadataTemplate_File)
-            
+        
+           
         if MetadataTemplate_File is False:
+            self.MetadataTemplate = configparser.ConfigParser()
             self.MetadataTemplate.read_dict(self.Metadata)
             filename = f"{self.filename}.metadata"
             self.Metadata_Filename = filename
@@ -180,7 +179,10 @@ class Parse():
     def check_values(self,MetadataTemplate_File):
         for section,values in self.MetadataTemplate.items():
             for key in values.keys():
-                if key in self.ini['Monitor']['site_setup'].split(','):
+                if key not in self.Metadata[section]:
+                    self.EV.errorLog('Missing in metadata file',f'{section}:{key}',self.TimeStamp)
+                    MetadataTemplate_File = False
+                elif key in self.ini['Monitor']['site_setup'].split(','):
                     try:
                         self.dataValues[key] = float(self.Metadata[section][key])
                     except:

@@ -20,13 +20,12 @@ from datetime import datetime
 import time
 importlib.reload(parseFile)
 
-
 class read_ALL():
-    def __init__(self,SiteID,Year,Month,processes=1,reset=0,Test=0,file_type='ghg',copy_From=None,copy_tag='',metadata_template='None'):
+    def __init__(self,siteID,Year,Month,processes=1,reset=0,Test=0,file_type='ghg',copy_From=None,copy_tag='',metadata_template='None'):
         self.file_type=file_type
-        self.Year = str(Year)
-        self.Month = "{:02d}".format(Month)
-        self.SiteID = SiteID
+        self.year = str(Year)
+        self.month = "{:02d}".format(Month)
+        self.siteID = siteID
         self.copy_From = copy_From
         self.copy_tag = copy_tag
 
@@ -35,13 +34,13 @@ class read_ALL():
         ini_file = ['ini_files/'+ini for ini in inis]
         self.ini = configparser.ConfigParser()
         self.ini.read(ini_file)
-        self.Root = sub_path(self,self.ini['Paths']['root_data_dir'])
+        self.read_data_dir = sub_path(self,self.ini['Paths']['read_data_dir'])
         
         # Create directories from template (see configuration.ini)
         self.ini['Paths']['dpath'] = sub_path(self,self.ini['Paths']['raw'])
         self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
         self.ini['Paths']['biomet_data'] = sub_path(self,self.ini['Paths']['biomet']+self.ini['filenames']['biomet'])
-        self.ini['filenames']['metadata_to_overwrite'] = sub_path(self,self.Root+self.ini['filenames']['metadata_to_overwrite'])
+        self.ini['filenames']['metadata_to_overwrite'] = sub_path(self,self.read_data_dir+self.ini['filenames']['metadata_to_overwrite'])
         self.ini['templates']['metadata_template']=metadata_template
 
         if reset == 1:
@@ -49,20 +48,23 @@ class read_ALL():
             if proceed.lower() == 'y' and os.path.isdir(self.ini['Paths']['meta_dir']):
                 print(f"Deleting all contents of: {self.ini['Paths']['meta_dir']}")
                 shutil.rmtree(self.ini['Paths']['meta_dir'])
+                time.sleep(1)
             else:
                 print(f"Keeping contents of: {self.ini['Paths']['meta_dir']}")
             
-        self.Parser = parseFile.Parse(self.ini)
 
         if not os.path.exists(self.ini['Paths']['meta_dir']):
             Path(self.ini['Paths']['meta_dir']).mkdir(parents=True, exist_ok=True)
+            time.sleep(1)
         self.Logs = []
         
         # Check for new .files - or overwrite if reset flag is set to true
         self.find_files(reset)
+        self.Parser = parseFile.Parse(self.ini)
         if hasattr(self, 'files'):
-            if self.files.loc[self.files.index.month==int(self.Month)].size>0:
+            if self.files.loc[self.files.index.month==int(self.month)].size>0:
                 self.Read(processes,Test,reset)
+
 
     def find_files (self,reset=0):
         # Find the name of every FULL file in the raw data folder located at the end of directory tree
@@ -85,7 +87,7 @@ class read_ALL():
                     all_files.append(file)
                     timestamp_info = re.search(self.ini[self.file_type]['search'], name).group(0)
                     TIMESTAMP.append(datetime.strptime(timestamp_info,self.ini[self.file_type]['format']))
-                    name_pattern.append(name.replace(timestamp_info,self.ini[self.file_type]['ep_date_pattern']+'.'+self.file_type))
+                    name_pattern.append(name.replace(timestamp_info,self.ini[self.file_type]['ep_date_pattern'])+'.'+self.file_type)
                     
             # Create dataframe of all GHG files
             df = pd.DataFrame(data={'filename':all_files,'TIMESTAMP':TIMESTAMP,'name_pattern':name_pattern})
@@ -120,7 +122,9 @@ class read_ALL():
             print(f"Not a valid directory: {self.ini['Paths']['dpath']}")
 
     def setup(self):
+        print(self.copy_From)
         for dir, _, files in os.walk(self.copy_From):
+
             pb = progressbar(len(files),'Copying Files')
             for file in files:
                 pb.step()
@@ -128,7 +132,7 @@ class read_ALL():
                     srch = re.search(self.ini[self.file_type]['search'], file).group(0)
                     if srch is not None:
                         TIMESTAMP =  datetime.strptime(srch,self.ini[self.file_type]['format'])
-                        if str(TIMESTAMP.year) == self.Year and str(TIMESTAMP.month).zfill(2) == self.Month:
+                        if str(TIMESTAMP.year) == self.year and str(TIMESTAMP.month).zfill(2) == self.month:
                             shutil.copy(f"{dir}/{file}",f"{self.ini['Paths']['dpath']}/{file}")
             pb.close()
 
@@ -156,19 +160,24 @@ class read_ALL():
         # Empty log for current run
         self.Log = self.makeEmpty()
 
+        self.to_Process = self.files.loc[
+            (
+            (self.files['filename'].isnull()==False)&
+            self.files['setup_ID'].isna()&
+            self.files['filename'].str.endswith(self.file_type)&
+            (self.files['filename'].str.contains('incomplete')==False)
+            )]
         if Test > 0:
-            self.to_Process = self.files.loc[(self.files['setup_ID'].isna()&(self.files['filename'].str.endswith(self.file_type)))][:Test]
-        else:
-            self.to_Process = self.files.loc[(self.files['setup_ID'].isna()&(self.files['filename'].str.endswith(self.file_type)))]
-
+            self.to_Process = self.to_Process.iloc[:Test]
         NameList = self.to_Process['filename'].values
         TimeList = self.to_Process.index
+
         if self.files.loc[self.files['MetaDataFile'].fillna('-').str.contains('.metadata')].size==0:
             # Run once to get the first Metadata file and use it as a template
             self.Parser.process_file([NameList[0],TimeList[0]],Template_File=False)
         if len(NameList)>0:
             if (__name__ == 'preProcessing' or __name__ == '__main__') and processes>1:
-                pb = progressbar(len(NameList),'Preprocessing Files')
+                pb = progressbar(len(NameList),f'Preprocessing {self.year} {self.month}')
                 with Pool(processes=processes) as pool:
 
                     # Break year into one-day chunks
@@ -182,10 +191,13 @@ class read_ALL():
                     pb.close()
             # Sequential processing is helpful for trouble shooting but will run much slower
             else:
+                # pb = progressbar(len(NameList),f'Preprocessing {self.year} {self.month}')
                 for fn,ts in zip(NameList,TimeList):
                     out = self.Parser.process_file([fn,ts],Testing=True)
                     self.appendRecs(out)
                     self.out = out
+                #     pb.step()
+                # pb.close()
 
             self.prepareOutputs()        
     
@@ -224,8 +236,9 @@ class read_ALL():
             # Assumes using only one timestamp column in biomet.  EP does support multiple timestamp columns so could implement a more generic solution
             self.bm = pd.read_csv(self.ini['Paths']['biomet_data'],parse_dates=[self.ini['biom_timestamp']['name']],date_format=self.ini['biom_timestamp']['format'],index_col=self.ini['biom_timestamp']['name'],skiprows=[1])
             for param in self.ini['Monitor']['in_biomet_file'].split(','):
-                ow = self.bm.loc[self.bm.index.isin(self.dynamic_metadata.index),param]
-                self.dynamic_metadata.loc[self.dynamic_metadata.index.isin(ow.index),param] = ow
+                if param in self.bm:
+                    ow = self.bm.loc[self.bm.index.isin(self.dynamic_metadata.index),param]
+                    self.dynamic_metadata.loc[self.dynamic_metadata.index.isin(ow.index),param] = ow
         self.dynamic_metadata['date'] = self.dynamic_metadata.index.strftime('%Y-%m-%d')
         self.dynamic_metadata['time'] = self.dynamic_metadata.index.strftime('%H:%M')
         dyn = ['date','time']+dyn
@@ -248,7 +261,7 @@ class read_ALL():
         self.Calibration = self.Calibration.drop_duplicates(keep='first')
 
     def GroupRuns(self):
-        Updates = self.files.loc[((self.files['Update']!='-')&(self.files.index.month==int(self.Month)))].copy()
+        Updates = self.files.loc[((self.files['Update']!='-')&(self.files.index.month==int(self.month)))].copy()
         Updates['dup'] = Updates['Update'].duplicated()
         toRemove = Updates.loc[Updates['dup']==True,'MetaDataFile'].values
         for rem in toRemove:
@@ -261,7 +274,7 @@ class read_ALL():
         Updates.loc[Updates['dup']==True,['Update','MetaDataFile']]=np.nan
         Updates['Update'].fillna('-',inplace=True)
         Updates['MetaDataFile'].ffill(inplace=True)
-        self.files.loc[((self.files['Update']!='-')&(self.files.index.month==int(self.Month))),['Update','MetaDataFile']] = Updates[['Update','MetaDataFile']]
+        self.files.loc[((self.files['Update']!='-')&(self.files.index.month==int(self.month))),['Update','MetaDataFile']] = Updates[['Update','MetaDataFile']]
         self.files['MetaDataFile'].ffill(inplace=True)
         
     # def Report(self):
@@ -278,7 +291,7 @@ if __name__ == '__main__':
     CLI=argparse.ArgumentParser()
 
     CLI.add_argument(
-    "--SiteID", 
+    "--siteID", 
     nargs='+', # 1 or more values expected => creates a list
     type=str,
     default=[],
@@ -307,7 +320,7 @@ if __name__ == '__main__':
     # parse the command line
     args = CLI.parse_args()
 
-    for site in args.SiteID:
+    for site in args.siteID:
         
         for year in args.Years:
 
