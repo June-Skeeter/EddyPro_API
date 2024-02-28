@@ -25,6 +25,7 @@ from HelperFunctions import EventLog as eL
 class Parse():
     def __init__(self,ini):
         self.ini = ini
+        self.max_missing = float(eval(self.ini['RawProcess_Settings']['max_lack']))*.01
         self.Vars = configparser.ConfigParser()
         self.Vars.read_file(open(self.ini['templates']['VariableList']))
 
@@ -116,6 +117,8 @@ class Parse():
         for key,val in self.Variable_Names.items():
             if key in self.data_columns:
                 Data[key]=pd.to_numeric(Data[key],errors='coerce')
+                if key in self.Vars['Essentials']['req'].split(',') and Data[key].isna().sum()>=self.max_missing*self.dataValues['n_samples']:
+                    self.EV.errorLog(f"Missing > {self.ini['RawProcess_Settings']['max_lack']} % ",f'{key}',self.TimeStamp)
                 if 'diag' in key:
                     self.getStats(Data,key,'max')
                 else:

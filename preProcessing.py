@@ -30,7 +30,7 @@ class read_ALL():
         self.copy_tag = copy_tag
 
         # Concatenate and read the ini files
-        inis = ['configuration.ini','Metadata_Instructions.ini']
+        inis = ['configuration.ini','Metadata_Instructions.ini','EP_Dynamic_Updates.ini']
         ini_file = ['ini_files/'+ini for ini in inis]
         self.ini = configparser.ConfigParser()
         self.ini.read(ini_file)
@@ -88,53 +88,53 @@ class read_ALL():
                     timestamp_info = re.search(self.ini[self.file_type]['search'], name).group(0)
                     TIMESTAMP.append(datetime.strptime(timestamp_info,self.ini[self.file_type]['format']))
                     name_pattern.append(name.replace(timestamp_info,self.ini[self.file_type]['ep_date_pattern'])+'.'+self.file_type)
+            if len(all_files)>0:
+                # Create dataframe of all GHG files
+                df = pd.DataFrame(data={'filename':all_files,'TIMESTAMP':TIMESTAMP,'name_pattern':name_pattern})
+                df = df.set_index('TIMESTAMP')
+                df['Flag']='-'
+                df['MetaDataFile'] = '-'
+                df['Update']='-'
+                df['setup_ID']=np.nan
+                # Flag timestamps with incomplete records
+                df.loc[(((df.index.minute!=30)&(df.index.minute!=0))|(df.index.second!=0)),'Flag'] = 'Incomplete Record'
+                for i,row in df.loc[((df['Flag']=='Incomplete Record')&(~df['filename'].str.contains('_incomplete')))].iterrows():
+                    old_fn = row['filename']
+                    new_fn = df.loc[df.index==i,'filename']=old_fn.split('.')[0]+'_incomplete.'+old_fn.split('.')[1]
+                    if os.path.isfile(f"{self.ini['Paths']['dpath']}/{new_fn}"):
+                        os.remove(f"{self.ini['Paths']['dpath']}/{new_fn}")
+                    os.rename(f"{self.ini['Paths']['dpath']}/{old_fn}",f"{self.ini['Paths']['dpath']}/{new_fn}")
                     
-            # Create dataframe of all GHG files
-            df = pd.DataFrame(data={'filename':all_files,'TIMESTAMP':TIMESTAMP,'name_pattern':name_pattern})
-            df = df.set_index('TIMESTAMP')
-            df['Flag']='-'
-            df['MetaDataFile'] = '-'
-            df['Update']='-'
-            df['setup_ID']=np.nan
-
-            # Flag timestamps with incomplete records
-            df.loc[(((df.index.minute!=30)&(df.index.minute!=0))|(df.index.second!=0)),'Flag'] = 'Incomplete Record'
-            for i,row in df.loc[((df['Flag']=='Incomplete Record')&(~df['filename'].str.contains('_incomplete')))].iterrows():
-                old_fn = row['filename']
-                new_fn = df.loc[df.index==i,'filename']=old_fn.split('.')[0]+'_incomplete.'+old_fn.split('.')[1]
-                if os.path.isfile(f"{self.ini['Paths']['dpath']}/{new_fn}"):
-                    os.remove(f"{self.ini['Paths']['dpath']}/{new_fn}")
-                os.rename(f"{self.ini['Paths']['dpath']}/{old_fn}",f"{self.ini['Paths']['dpath']}/{new_fn}")
-                
-            # Resample to get timestamp on consistent half-hourly intervals
-            df = df.resample('30T').first()
-            # Write new file or append to existing file
-            if reset == 1 or os.path.isfile(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory']) == False:
-                # Sort so that oldest files get processed first
-                self.files = df.sort_index()#ascending=False)
-                self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
-            else:
-                self.files = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
-                self.files = pd.concat([self.files,df.loc[df.index.isin(self.files.index)==False]])
-                # Sort so that oldest files get processed first
-                self.files = self.files.sort_index()#ascending=False)
+                # Resample to get timestamp on consistent half-hourly intervals
+                df = df.resample('30T').first()
+                # Write new file or append to existing file
+                if reset == 1 or os.path.isfile(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory']) == False:
+                    # Sort so that oldest files get processed first
+                    self.files = df.sort_index()#ascending=False)
+                    self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
+                else:
+                    self.files = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+                    self.files = pd.concat([self.files,df.loc[df.index.isin(self.files.index)==False]])
+                    # Resample to get timestamp on consistent half-hourly intervals
+                    self.files = self.files.resample('30T').asfreq()
+                    # Sort so that oldest files get processed first
+                    self.files = self.files.sort_index()#ascending=False)
         else:
             print(f"Not a valid directory: {self.ini['Paths']['dpath']}")
 
     def setup(self):
-        print(self.copy_From)
         for dir, _, files in os.walk(self.copy_From):
-
-            pb = progressbar(len(files),'Copying Files')
-            for file in files:
-                pb.step()
-                if file.endswith(self.file_type) and self.copy_tag in file and os.path.isfile(f"{self.ini['Paths']['dpath']}/{file}") == False:
-                    srch = re.search(self.ini[self.file_type]['search'], file).group(0)
-                    if srch is not None:
-                        TIMESTAMP =  datetime.strptime(srch,self.ini[self.file_type]['format'])
-                        if str(TIMESTAMP.year) == self.year and str(TIMESTAMP.month).zfill(2) == self.month:
-                            shutil.copy(f"{dir}/{file}",f"{self.ini['Paths']['dpath']}/{file}")
-            pb.close()
+            if len(files)>0:
+                pb = progressbar(len(files),'Copying Files')
+                for file in files:
+                    pb.step()
+                    if file.endswith(self.file_type) and self.copy_tag in file and os.path.isfile(f"{self.ini['Paths']['dpath']}/{file}") == False:
+                        srch = re.search(self.ini[self.file_type]['search'], file).group(0)
+                        if srch is not None:
+                            TIMESTAMP =  datetime.strptime(srch,self.ini[self.file_type]['format'])
+                            if str(TIMESTAMP.year) == self.year and str(TIMESTAMP.month).zfill(2) == self.month:
+                                shutil.copy(f"{dir}/{file}",f"{self.ini['Paths']['dpath']}/{file}")
+                pb.close()
 
 
     def makeEmpty(self,type='object',ixName='TIMESTAMP'):
@@ -247,6 +247,7 @@ class read_ALL():
         self.Calibration.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
         self.GroupRuns()
         self.files = self.files.join(self.Logs)
+        self.files['filename']=self.files['filename'].fillna('-')
         self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
 
     def GroupCommon(self):
