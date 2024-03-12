@@ -21,7 +21,7 @@ import time
 importlib.reload(parseFile)
 
 class read_ALL():
-    def __init__(self,siteID,Year,Month,processes=1,reset=0,Test=0,file_type='ghg',copy_From=None,copy_tag='',metadata_template='None'):
+    def __init__(self,siteID,Year,Month,processes=1,reset=0,Test=0,file_type='ghg',copy_From=None,copy_tag='',metadata_template=[]):
         self.file_type=file_type
         self.year = str(Year)
         self.month = "{:02d}".format(Month)
@@ -41,7 +41,7 @@ class read_ALL():
         self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
         self.ini['Paths']['biomet_data'] = sub_path(self,self.ini['Paths']['biomet']+self.ini['filenames']['biomet'])
         self.ini['filenames']['metadata_to_overwrite'] = sub_path(self,self.read_data_dir+self.ini['filenames']['metadata_to_overwrite'])
-        self.ini['templates']['metadata_template']=metadata_template
+        
 
         if reset == 1:
             proceed = input(f"Warning: You are about to complete a hard reset, deleting all contents of: {self.ini['Paths']['meta_dir']}\nDo you wish to proceed? Y/N")
@@ -52,10 +52,17 @@ class read_ALL():
             else:
                 print(f"Keeping contents of: {self.ini['Paths']['meta_dir']}")
             
-
         if not os.path.exists(self.ini['Paths']['meta_dir']):
             Path(self.ini['Paths']['meta_dir']).mkdir(parents=True, exist_ok=True)
             time.sleep(1)
+
+        # Copy over any metadata templates
+        for md in metadata_template:
+            if not os.path.isfile(self.ini['Paths']['meta_dir']+os.path.basename(md)):
+                print('Copying Metadata file:\n',md)
+                shutil.copy2(md,self.ini['Paths']['meta_dir'])
+        
+        time.sleep(1)
         self.Logs = []
         
         # Check for new .files - or overwrite if reset flag is set to true
