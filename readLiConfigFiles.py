@@ -20,11 +20,11 @@ class read_LI_Config():
     # Unless dealing with xml format - the all values are saved
     # Only available for 7500 so far?
 
-    def __init__(self,ini_file='ini_files/ReadLiConfigFiles.ini',Log=None):
-        if Log == None:
-            self.EV = el.EventLog()
-        else:
-            self.EV = Log
+    def __init__(self,ini_file='ini_files/ReadLiConfigFiles.ini'):#,Log=None
+        # if Log == None:
+        #     self.EV = el.EventLog()
+        # else:
+        #     self.EV = Log
             
         self.calData = pd.DataFrame()
 
@@ -74,7 +74,8 @@ class read_LI_Config():
             config.read_string(formatted)
             self.parsedConfig[key]={section: dict(config[section]) for section in config.sections()}
         except:
-            self.EV.errorLog('Calibration',f'Unable to Parse {key} from .conf',TimeStamp)
+            pass
+            # self.EV.updateLog('Calibration',f'Unable to Parse {key} from .conf','Flag')
 
     def readXML(self,file,i,TimeStamp):
         with open(self.ini_XML['calibrate_map']) as json_file:

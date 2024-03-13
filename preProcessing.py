@@ -21,7 +21,7 @@ import time
 importlib.reload(parseFile)
 
 class read_ALL():
-    def __init__(self,siteID,Year,Month,processes=1,reset=0,Test=0,file_type='ghg',copy_From=None,copy_tag='',metadata_template=[]):
+    def __init__(self,siteID,Year,Month,processes=1,reset=0,Test=0,file_type='ghg',copy_From=None,copy_tag='',metadata_template=[],metadata_updates=None):
         self.file_type=file_type
         self.year = str(Year)
         self.month = "{:02d}".format(Month)
@@ -40,7 +40,8 @@ class read_ALL():
         self.ini['Paths']['dpath'] = sub_path(self,self.ini['Paths']['raw'])
         self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
         self.ini['Paths']['biomet_data'] = sub_path(self,self.ini['Paths']['biomet']+self.ini['filenames']['biomet'])
-        self.ini['filenames']['metadata_to_overwrite'] = sub_path(self,self.read_data_dir+self.ini['filenames']['metadata_to_overwrite'])
+        if metadata_updates is not None:
+            self.ini['filenames']['metadata_to_overwrite'] = sub_path(self,metadata_updates)
         
 
         if reset == 1:
@@ -99,9 +100,9 @@ class read_ALL():
                 # Create dataframe of all GHG files
                 df = pd.DataFrame(data={'filename':all_files,'TIMESTAMP':TIMESTAMP,'name_pattern':name_pattern})
                 df = df.set_index('TIMESTAMP')
-                df['Flag']='-'
-                df['MetaDataFile'] = '-'
-                df['Update']='-'
+                df['Flag']=''
+                df['MetaDataFile'] = ''
+                df['Update']=''
                 df['setup_ID']=np.nan
                 # Flag timestamps with incomplete records
                 df.loc[(((df.index.minute!=30)&(df.index.minute!=0))|(df.index.second!=0)),'Flag'] = 'Incomplete Record'
@@ -179,7 +180,7 @@ class read_ALL():
         NameList = self.to_Process['filename'].values
         TimeList = self.to_Process.index
 
-        if self.files.loc[self.files['MetaDataFile'].fillna('-').str.contains('.metadata')].size==0:
+        if self.files.loc[self.files['MetaDataFile'].fillna('').str.contains('.metadata')].size==0:
             # Run once to get the first Metadata file and use it as a template
             self.Parser.process_file([NameList[0],TimeList[0]],Template_File=False)
         if len(NameList)>0:
@@ -220,12 +221,14 @@ class read_ALL():
         self.site_setup = pd.concat([self.site_setup,df[stup]])
 
         self.dataRecords = pd.concat([self.dataRecords,df.loc[:,df.columns.isin(dyn+stup)==False]])
-        self.files['Flag'] = self.files['Flag'].replace('-',np.nan)
-        self.files['Flag'] = self.files['Flag'].fillna(out['Flag'])
-        self.files['Flag'] = self.files['Flag'].fillna('-')
-        self.files['Update'] = self.files['Update'].replace('-',np.nan)
-        self.files['Update'] = self.files['Update'].fillna(out['Update'])
-        self.files['Update'] = self.files['Update'].fillna('-')
+        # self.files['Flag'] = self.files['Flag'].replace('',np.nan)
+        # self.files['Flag'] = self.files['Flag'].fillna(out['Flag'])
+        self.files.loc[out['TimeStamp'],'Flag']=out['Log']['Flag']
+        # self.files['Flag'] = self.files['Flag'].fillna('')
+        # self.files['Update'] = self.files['Update'].replace('',np.nan)
+        # self.files['Update'] = self.files['Update'].fillna(out['Update'])
+        self.files.loc[out['TimeStamp'],'Update']=out['Log']['Update']
+        # self.files['Update'] = self.files['Update'].fillna('')
         self.files.loc[self.files.index==out['TimeStamp'],'MetaDataFile'] = out['MetadataFile']
         self.Calibration = pd.concat([self.Calibration,out['calData']])
     
@@ -254,7 +257,7 @@ class read_ALL():
         self.Calibration.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
         self.GroupRuns()
         self.files = self.files.join(self.Logs)
-        self.files['filename']=self.files['filename'].fillna('-')
+        self.files['filename']=self.files['filename'].fillna('')
         self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
 
     def GroupCommon(self):
@@ -269,21 +272,30 @@ class read_ALL():
         self.Calibration = self.Calibration.drop_duplicates(keep='first')
 
     def GroupRuns(self):
-        Updates = self.files.loc[((self.files['Update']!='-')&(self.files.index.month==int(self.month)))].copy()
-        Updates['dup'] = Updates['Update'].duplicated()
-        toRemove = Updates.loc[Updates['dup']==True,'MetaDataFile'].values
+        Grp = self.files.groupby(['Flag','setup_ID','name_pattern']).first()[['MetaDataFile']]
+        mdKeep = Grp['MetaDataFile'].values
+        toRemove = self.files.loc[self.files['MetaDataFile'].isin(mdKeep)==False,'MetaDataFile'].unique()
+        for i,row in Grp.iterrows():
+            self.files.loc[(
+                (self.files['Flag']==i[0])&
+                (self.files['setup_ID']==i[1])&
+                (self.files['name_pattern']==i[2])
+                ),'MetaDataFile']=row['MetaDataFile']
+        # Updates = self.files.loc[((self.files['Update']!='')&(self.files.index.month==int(self.month)))].copy()
+        # Updates['dup'] = Updates['Update'].duplicated()
+        # toRemove = Updates.loc[Updates['dup']==True,'MetaDataFile'].values
         for rem in toRemove:
-            self.files.loc[self.files['MetaDataFile']==rem,'MetaDataFile']=np.nan
+            # self.files.loc[self.files['MetaDataFile']==rem,'MetaDataFile']=np.nan
             if os.path.isfile(f"{self.ini['Paths']['meta_dir']}{rem}"):
                 os.remove(f"{self.ini['Paths']['meta_dir']}{rem}")
             if os.path.isfile(f"{self.ini['Paths']['meta_dir']}{rem.replace('.metadata','.eddypro')}"):
                 os.remove(f"{self.ini['Paths']['meta_dir']}{rem.replace('.metadata','.eddypro')}")
         
-        Updates.loc[Updates['dup']==True,['Update','MetaDataFile']]=np.nan
-        Updates['Update'].fillna('-',inplace=True)
-        Updates['MetaDataFile'].ffill(inplace=True)
-        self.files.loc[((self.files['Update']!='-')&(self.files.index.month==int(self.month))),['Update','MetaDataFile']] = Updates[['Update','MetaDataFile']]
-        self.files['MetaDataFile'].ffill(inplace=True)
+        # Updates.loc[Updates['dup']==True,['Update','MetaDataFile']]=np.nan
+        # Updates['Update'].fillna('',inplace=True)
+        # Updates['MetaDataFile'].ffill(inplace=True)
+        # self.files.loc[((self.files['Update']!='')&(self.files.index.month==int(self.month))),['Update','MetaDataFile']] = Updates[['Update','MetaDataFile']]
+        # self.files['MetaDataFile'].ffill(inplace=True)
         
     # def Report(self):
 

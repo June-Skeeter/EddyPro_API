@@ -40,10 +40,10 @@ class Parse():
         
         self.dataValues = {}
 
-        self.EV = eL()
-        self.getCal = rLCF.read_LI_Config(Log=self.EV)
+        self.getCal = rLCF.read_LI_Config()
 
     def process_file(self,input,Template_File=True,Testing=False):
+        self.EV = eL()
         self.Template_File_Available = Template_File
         self.filename = input[0]
         self.TimeStamp = input[1]
@@ -65,22 +65,33 @@ class Parse():
                         # Read the co2app file (and header info) - only useful if there is a 7200
                         self.getCal.readConfig(ghgZip.open(self.ghgFiles['system_config']['co2app']).read().decode("utf-8"),self.TimeStamp)
                     else:
-                        self.EV.errorLog('Calibration','Missing',self.TimeStamp)
+                        self.EV.updateLog('Calibration','Missing','Flag')
 
-            self.EV.cleanLog(self.TimeStamp)
+            # self.EV.cleanLog(self.TimeStamp)
         else:
             templateFiles = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*.metadata")]
             templateFiles.sort()
             self.Parse_Metadata(open(templateFiles[-1]),self.Template_File_Available)
             self.readHeader(self.fullFile)
             self.read_dat(self.fullFile)
-            self.EV.cleanLog(self.TimeStamp)
+            # self.EV.cleanLog(self.TimeStamp)
             self.Metadata_Filename = os.path.basename(templateFiles[-1])
+        if Testing == True:
+            print({'TimeStamp':self.TimeStamp,
+                # 'dataValues':self.dataValues.copy(),
+                'MetadataFile':self.Metadata_Filename,
+                # 'Update':self.EV.dfLog['Update'].copy(),
+                # 'Flag':self.EV.dfLog['Flag'].copy(),
+                # 'calData':self.getCal.calData.copy(),
+                'Updated':self.Template_File_Available})
         return({'TimeStamp':self.TimeStamp,
                 'dataValues':self.dataValues.copy(),
                 'MetadataFile':self.Metadata_Filename,
-                'Update':self.EV.dfLog['Update'].copy(),
-                'Flag':self.EV.dfLog['Flag'].copy(),
+                'Log':self.EV.Log,
+                # 'Update':self.EV.Log['Update'],
+                # 'Flag':self.EV.Log['Flag'],
+                # 'Update':self.EV.dfLog['Update'].copy(),
+                # 'Flag':self.EV.dfLog['Flag'].copy(),
                 'calData':self.getCal.calData.copy(),
                 'Updated':self.Template_File_Available})
 
@@ -118,7 +129,7 @@ class Parse():
             if key in self.data_columns:
                 Data[key]=pd.to_numeric(Data[key],errors='coerce')
                 if key in self.Vars['Essentials']['req'].split(',') and Data[key].isna().sum()>=self.max_missing*self.dataValues['n_samples']:
-                    self.EV.errorLog(f"Missing > {self.ini['RawProcess_Settings']['max_lack']} % ",f'{key}',self.TimeStamp)
+                    self.EV.updateLog(f"Missing > {self.ini['RawProcess_Settings']['max_lack']} % ",f'{key}','Flag')
                 if 'diag' in key:
                     self.getStats(Data,key,'max')
                 else:
@@ -183,7 +194,7 @@ class Parse():
         for section,values in self.MetadataTemplate.items():
             for key in values.keys():
                 if key not in self.Metadata[section]:
-                    self.EV.errorLog('Missing in metadata file',f'{section}:{key}',self.TimeStamp)
+                    self.EV.updateLog('Missing in metadata file',f'{section}:{key}','Flag')
                     MetadataTemplate_File = False
                 elif key in self.ini['Monitor']['site_setup'].split(','):
                     try:
@@ -192,7 +203,7 @@ class Parse():
                         self.dataValues[key] = np.nan
                     # Overwrite any values from the correction
                     if self.Metadata[section][key]!=self.MetadataTemplate[section][key]:
-                        self.EV.updateLog(f'Setup {key}',self.Metadata[section][key],self.TimeStamp)
+                        self.EV.updateLog(f'Setup {key}',self.Metadata[section][key],'Update')
                         MetadataTemplate_File = False
                 elif key in self.ini['Monitor']['dynamic_metadata'].split(','):
                     self.dataValues[key] = float(self.Metadata[section][key])
@@ -200,7 +211,7 @@ class Parse():
                     self.dataValues[key] = eval(self.ini['Calculate'][key])
                 elif key not in self.ini['Overwrite'].keys():
                     if self.Metadata[section][key]!=self.MetadataTemplate[section][key]:
-                        self.EV.updateLog(f'Other {key}',self.Metadata[section][key],self.TimeStamp)
+                        self.EV.updateLog(f'Other {key}',self.Metadata[section][key],'Update')
                         MetadataTemplate_File = False
         return(MetadataTemplate_File)
 
@@ -289,5 +300,5 @@ class Parse():
             elif stat == 'max':
                 self.dataValues[rec] = tbl[rec].astype('float').max()
         except:
-            self.EV.errorLog('Missing Data Value',rec,self.TimeStamp)
+            self.EV.updateLog('Missing Data Value',rec,'Flag')
             pass

@@ -1,4 +1,5 @@
 import sys
+import numpy as np
 import pandas as pd
 
 
@@ -13,36 +14,6 @@ def sub_path(class_object,path_string):
             path_string = path_string.replace(f'**{sub}**',str(class_object.__getattribute__(sub))).replace('None','')
         else:
             path_string = path_string.replace(f'**{sub}**','')
-    
-    # if hasattr(class_object, 'read_data_dir'):
-    #     path_string = path_string.replace('read_data_dir',str(class_object.read_data_dir))
-    # else:
-    #     path_string = path_string.replace('read_data_dir','')
-        
-    # if hasattr(class_object, 'write_data_dir'):
-    #     path_string = path_string.replace('write_data_dir',str(class_object.write_data_dir))
-    # else:
-    #     path_string = path_string.replace('write_data_dir','')
-
-    # if hasattr(class_object, 'Year'):
-    #     path_string = path_string.replace('YEAR',str(class_object.Year)).replace('None','')
-    # else:
-    #     path_string = path_string.replace('YEAR','')
-    
-    # if hasattr(class_object, 'Month'):
-    #     path_string = path_string.replace('MONTH',str(class_object.Month)).replace('None','')
-    # else:
-    #     path_string = path_string.replace('MONTH','')
-    
-    # if hasattr(class_object, 'SiteID'):
-    #     path_string = path_string.replace('SITEID',str(class_object.SiteID)).replace('None','')
-    # else:
-    #     path_string = path_string.replace('SITEID','')
-    
-    # if hasattr(class_object, 'dateStr'):
-    #     path_string = path_string.replace('DATE',str(class_object.dateStr)).replace('None','')
-    # else:
-    #     path_string = path_string.replace('DATE','')
     
     path_string = path_string.replace('//','/')
     path_string = path_string.replace('\\\\','\\')
@@ -75,28 +46,34 @@ class progressbar():
 # Logs exceptions and configuration changes that come up during pre-processing
 class EventLog():
     def __init__(self):
-        self.dfLog = pd.DataFrame({
-            'Flag': pd.Series(dtype='str'),
-            'Update': pd.Series(dtype='str')
-        })
-        self.dfLog.index.name='timestamp'
+        self.Log={
+            'Flag':'',
+            'Update':'',
+        }
+        # self.dfLog = pd.DataFrame({
+        #     'Flag': pd.Series(dtype='str'),
+        #     'Update': pd.Series(dtype='str')
+        # })
+        # self.dfLog.index.name='timestamp'
 
-    def errorLog(self,Issue,Record,TimeStamp):
-        Flag = f'{Issue}:{Record}'
-        try:
-            self.dfLog.loc[TimeStamp,'Flag']+='|'+Flag
-        except:
-            self.dfLog.loc[TimeStamp,'Flag']=Flag
-            pass
+    # def errorLog(self,Issue,Record,TimeStamp):
+    #     Flag = f'{Issue}:{Record}'
+    #     self.Log['Flag']=(self.Log['Flag']+'|'+Flag).lstrip('|')
+        # try:
+        #     self.dfLog.loc[TimeStamp,'Flag']+='|'+Flag
+        # except:
+        #     self.dfLog.loc[TimeStamp,'Flag']=Flag
+        #     pass
 
-    def updateLog(self,Record,Value,TimeStamp):
-        Note = f'{Record}:{Value}'
-        try:
-            self.dfLog.loc[TimeStamp,'Update']+='|'+Note
-        except:
-            self.dfLog.loc[TimeStamp,'Update']=Note
-            pass
+    def updateLog(self,Record,Value,Key='Flag'):
+        Update = f'{Record}:{Value}'
+        self.Log[Key]=(self.Log[Key]+'|'+Update).lstrip('|')
+        # try:
+        #     self.dfLog.loc[TimeStamp,'Update']+='|'+Note
+        # except:
+        #     self.dfLog.loc[TimeStamp,'Update']=Note
+        #     pass
 
-    def cleanLog(self,TimeStamp):
-        if (self.dfLog.index==TimeStamp).any() == False:
-            self.dfLog.loc[TimeStamp,'Flag'] = '-'
+    # def cleanLog(self,TimeStamp):
+    #     if (self.dfLog.index==TimeStamp).any() == False:
+    #         self.dfLog.loc[TimeStamp,'Flag'] = ''
