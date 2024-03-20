@@ -37,7 +37,6 @@ class makeRun():
         self.ini.read(ini_file)
         
         self.siteID = siteID
-        # print(self.siteID)
 
         # Template file to be filled updated
         self.epRun = configparser.ConfigParser()
@@ -55,8 +54,7 @@ class makeRun():
         self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
 
         self.inventory = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
-        self.inventory['MetaDataFile'] = self.inventory['MetaDataFile'].fillna('-')
-        self.inventory = self.inventory.loc[((self.inventory['filename']!='-')&(self.inventory['MetaDataFile']!='-')&(self.inventory['MetaDataFile']!='-')&(self.inventory['Flag']=='-'))].copy()
+        self.inventory = self.inventory.loc[((self.inventory['filename'].isna()==False)&(self.inventory['MetaDataFile'].isna()==False))].copy()
     
     def runDates(self,dateRange):
         self.runList = []
@@ -84,9 +82,7 @@ class makeRun():
         Subset_Inventory.loc[Subset_Inventory['set']<1,'set']=np.nan
         Subset_Inventory.loc[~Subset_Inventory['set'].isna(),'set']=Subset_Inventory.loc[~Subset_Inventory['set'].isna(),'ix']
         Subset_Inventory['set']=Subset_Inventory['set'].ffill()
-
         Metadata_Files_in_Range = Subset_Inventory.groupby(['MetaDataFile','name_pattern','set']).first().index.values
-        
         # Each unique (based on metadata files) time period within the range index will be split by the number of Processes
         if len(Metadata_Files_in_Range)>1:
             print(f"Splitting into {len(Metadata_Files_in_Range)} batches due to update metadata")
@@ -153,6 +149,7 @@ class makeRun():
           
         self.submit()
         self.merge_outputs()
+        
     
     def submit(self):
         if len(self.runList) < self.Processes:
@@ -245,9 +242,10 @@ class makeRun():
                 fullFile.sort_values(by=fullFile.columns[0])
                 fullFile = fullFile.loc[fullFile.duplicated()==False].copy()
                 os.remove(self.output_path+f)
-            fn = f'{self.output_path}eddypro_{self.name}_{start}_{end}{m}{rt}_adv.csv'
-            fullFile.to_csv(fn,index=False)
-            self.all_outputs[m.replace('_','')]=fn
+            if len(files)>0:
+                fn = f'{self.output_path}eddypro_{self.name}_{start}_{end}{m}{rt}_adv.csv'
+                fullFile.to_csv(fn,index=False)
+                self.all_outputs[m.replace('_','')]=fn
 
 # If called from command line ...
 if __name__ == '__main__':

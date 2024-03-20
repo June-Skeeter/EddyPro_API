@@ -9,7 +9,6 @@ import configparser
 import numpy as np
 import pandas as pd
 from pathlib import Path
-# from subPath import sub_path
 from HelperFunctions import sub_path
 from multiprocessing import Pool
 from HelperFunctions import progressbar
@@ -152,7 +151,6 @@ class read_ALL():
         return(empty)
     
     def Read(self,processes,Test,reset):
-        
         # Read existing data records if they exist, create empty ones if they don't exist
         if reset == 0 and os.path.isfile(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means']):
             self.dataRecords = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
@@ -163,7 +161,7 @@ class read_ALL():
             self.dataRecords = self.makeEmpty(type='float')
             self.dynamic_metadata = self.makeEmpty(type='float')
             self.site_setup = self.makeEmpty(type='float')
-            self.Calibration = self.makeEmpty()#ixName='TIMESTAMP')
+            self.Calibration = self.makeEmpty()
 
         # Empty log for current run
         self.Log = self.makeEmpty()
@@ -188,10 +186,9 @@ class read_ALL():
                 pb = progressbar(len(NameList),f'Preprocessing {self.year} {self.month}')
                 with Pool(processes=processes) as pool:
 
-                    # Break year into one-day chunks
+                    # Break request into one-day chunks
                     max_chunksize=48
                     chunksize=min(int(np.ceil(len(NameList)/processes)),max_chunksize)
-                    
                     for out in pool.imap(self.Parser.process_file,zip(NameList,TimeList),chunksize=chunksize):
                         self.appendRecs(out)
                         pb.step()
@@ -199,14 +196,10 @@ class read_ALL():
                     pb.close()
             # Sequential processing is helpful for trouble shooting but will run much slower
             else:
-                # pb = progressbar(len(NameList),f'Preprocessing {self.year} {self.month}')
                 for fn,ts in zip(NameList,TimeList):
                     out = self.Parser.process_file([fn,ts],Testing=True)
                     self.appendRecs(out)
                     self.out = out
-                #     pb.step()
-                # pb.close()
-
             self.prepareOutputs()        
     
     def appendRecs(self,out):
@@ -221,14 +214,8 @@ class read_ALL():
         self.site_setup = pd.concat([self.site_setup,df[stup]])
 
         self.dataRecords = pd.concat([self.dataRecords,df.loc[:,df.columns.isin(dyn+stup)==False]])
-        # self.files['Flag'] = self.files['Flag'].replace('',np.nan)
-        # self.files['Flag'] = self.files['Flag'].fillna(out['Flag'])
         self.files.loc[out['TimeStamp'],'Flag']=out['Log']['Flag']
-        # self.files['Flag'] = self.files['Flag'].fillna('')
-        # self.files['Update'] = self.files['Update'].replace('',np.nan)
-        # self.files['Update'] = self.files['Update'].fillna(out['Update'])
         self.files.loc[out['TimeStamp'],'Update']=out['Log']['Update']
-        # self.files['Update'] = self.files['Update'].fillna('')
         self.files.loc[self.files.index==out['TimeStamp'],'MetaDataFile'] = out['MetadataFile']
         self.Calibration = pd.concat([self.Calibration,out['calData']])
     
@@ -274,32 +261,19 @@ class read_ALL():
     def GroupRuns(self):
         Grp = self.files.groupby(['Flag','setup_ID','name_pattern']).first()[['MetaDataFile']]
         mdKeep = Grp['MetaDataFile'].values
-        toRemove = self.files.loc[self.files['MetaDataFile'].isin(mdKeep)==False,'MetaDataFile'].unique()
+        toRemove = self.files.loc[self.files['MetaDataFile'].isin(mdKeep)==False,'MetaDataFile'].dropna().unique()
         for i,row in Grp.iterrows():
             self.files.loc[(
                 (self.files['Flag']==i[0])&
                 (self.files['setup_ID']==i[1])&
                 (self.files['name_pattern']==i[2])
                 ),'MetaDataFile']=row['MetaDataFile']
-        # Updates = self.files.loc[((self.files['Update']!='')&(self.files.index.month==int(self.month)))].copy()
-        # Updates['dup'] = Updates['Update'].duplicated()
-        # toRemove = Updates.loc[Updates['dup']==True,'MetaDataFile'].values
         for rem in toRemove:
-            # self.files.loc[self.files['MetaDataFile']==rem,'MetaDataFile']=np.nan
             if os.path.isfile(f"{self.ini['Paths']['meta_dir']}{rem}"):
                 os.remove(f"{self.ini['Paths']['meta_dir']}{rem}")
             if os.path.isfile(f"{self.ini['Paths']['meta_dir']}{rem.replace('.metadata','.eddypro')}"):
                 os.remove(f"{self.ini['Paths']['meta_dir']}{rem.replace('.metadata','.eddypro')}")
         
-        # Updates.loc[Updates['dup']==True,['Update','MetaDataFile']]=np.nan
-        # Updates['Update'].fillna('',inplace=True)
-        # Updates['MetaDataFile'].ffill(inplace=True)
-        # self.files.loc[((self.files['Update']!='')&(self.files.index.month==int(self.month))),['Update','MetaDataFile']] = Updates[['Update','MetaDataFile']]
-        # self.files['MetaDataFile'].ffill(inplace=True)
-        
-    # def Report(self):
-
-
 # If called from command line ...
 if __name__ == '__main__':
     
