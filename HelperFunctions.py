@@ -45,35 +45,11 @@ class progressbar():
 
 # Logs exceptions and configuration changes that come up during pre-processing
 class EventLog():
-    def __init__(self):
-        self.Log={
-            'Flag':'',
-            'Update':'',
-        }
-        # self.dfLog = pd.DataFrame({
-        #     'Flag': pd.Series(dtype='str'),
-        #     'Update': pd.Series(dtype='str')
-        # })
-        # self.dfLog.index.name='timestamp'
-
-    # def errorLog(self,Issue,Record,TimeStamp):
-    #     Flag = f'{Issue}:{Record}'
-    #     self.Log['Flag']=(self.Log['Flag']+'|'+Flag).lstrip('|')
-        # try:
-        #     self.dfLog.loc[TimeStamp,'Flag']+='|'+Flag
-        # except:
-        #     self.dfLog.loc[TimeStamp,'Flag']=Flag
-        #     pass
+    def __init__(self,classes=['Flag']):
+        self.Log={}
+        for c in classes:
+            self.Log[c] = ''
 
     def updateLog(self,Record,Value,Key='Flag'):
         Update = f'{Record}:{Value}'
         self.Log[Key]=(self.Log[Key]+'|'+Update).lstrip('|')
-        # try:
-        #     self.dfLog.loc[TimeStamp,'Update']+='|'+Note
-        # except:
-        #     self.dfLog.loc[TimeStamp,'Update']=Note
-        #     pass
-
-    # def cleanLog(self,TimeStamp):
-    #     if (self.dfLog.index==TimeStamp).any() == False:
-    #         self.dfLog.loc[TimeStamp,'Flag'] = ''

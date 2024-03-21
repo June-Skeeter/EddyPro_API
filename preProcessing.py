@@ -169,6 +169,7 @@ class read_ALL():
         self.to_Process = self.files.loc[
             (
             (self.files['filename'].isnull()==False)&
+            (self.files.index.month==int(self.month))&
             self.files['setup_ID'].isna()&
             self.files['filename'].str.endswith(self.file_type)&
             (self.files['filename'].str.contains('incomplete')==False)
@@ -197,6 +198,7 @@ class read_ALL():
             # Sequential processing is helpful for trouble shooting but will run much slower
             else:
                 for fn,ts in zip(NameList,TimeList):
+                    print(ts)
                     out = self.Parser.process_file([fn,ts],Testing=True)
                     self.appendRecs(out)
                     self.out = out
@@ -205,19 +207,26 @@ class read_ALL():
     def appendRecs(self,out):
         df = pd.DataFrame(data=out['dataValues'],index=[out['TimeStamp']])
         df.index.name='TIMESTAMP'
+        if out['Log']['Failed_to_Parse'] == '':
+            dyn = self.ini['Monitor']['dynamic_metadata'].split(',')
+            stup = self.ini['Monitor']['site_setup'].split(',')
+            stup = [x for x in stup if x in df.columns.values]
+            self.ini['Monitor']['site_setup'] = ','.join(stup)
 
-        dyn = self.ini['Monitor']['dynamic_metadata'].split(',')
-        self.dynamic_metadata = pd.concat([self.dynamic_metadata,df[dyn]])
-        stup = self.ini['Monitor']['site_setup'].split(',')
-        stup = [x for x in stup if x in df.columns.values]
-        self.ini['Monitor']['site_setup'] = ','.join(stup)
-        self.site_setup = pd.concat([self.site_setup,df[stup]])
+            self.dynamic_metadata = pd.concat([self.dynamic_metadata,df[dyn]])
+            self.site_setup = pd.concat([self.site_setup,df[stup]])
+            self.dataRecords = pd.concat([self.dataRecords,df.loc[:,df.columns.isin(dyn+stup)==False]])
+            self.Calibration = pd.concat([self.Calibration,out['calData']])
 
-        self.dataRecords = pd.concat([self.dataRecords,df.loc[:,df.columns.isin(dyn+stup)==False]])
+        else:
+            self.dynamic_metadata = pd.concat([self.dynamic_metadata,df])
+            self.site_setup = pd.concat([self.site_setup,df])
+            self.dataRecords = pd.concat([self.dataRecords,df])
+            self.Calibration = pd.concat([self.Calibration,df])
+
         self.files.loc[out['TimeStamp'],'Flag']=out['Log']['Flag']
         self.files.loc[out['TimeStamp'],'Update']=out['Log']['Update']
         self.files.loc[self.files.index==out['TimeStamp'],'MetaDataFile'] = out['MetadataFile']
-        self.Calibration = pd.concat([self.Calibration,out['calData']])
     
     def prepareOutputs(self):
         self.GroupCommon()
@@ -225,8 +234,9 @@ class read_ALL():
         static = [d for d in dyn if d in self.ini['Monitor']['fixed_dynamic']]
         dyn = [d for d in dyn if d not in self.ini['Monitor']['fixed_dynamic']]
         for s in static:
-            self.dataRecords[s] = self.dynamic_metadata[s].mean()
-            self.dataRecords[s+'_1SE'] = self.dynamic_metadata[s].std()/(self.dynamic_metadata[s].count()**.5)
+            if s in self.dynamic_metadata.columns:
+                self.dataRecords[s] = self.dynamic_metadata[s].mean()
+                self.dataRecords[s+'_1SE'] = self.dynamic_metadata[s].std()/(self.dynamic_metadata[s].count()**.5)
         self.dataRecords.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means'])
         
         if self.ini['Monitor']['in_biomet_file'] != '':

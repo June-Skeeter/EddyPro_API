@@ -13,6 +13,7 @@ from io import TextIOWrapper
 import xml.etree.ElementTree as ET
 import datetime
 import importlib
+import traceback
 
 import readLiConfigFiles as rLCF
 importlib.reload(rLCF)
@@ -38,60 +39,56 @@ class Parse():
         biometData = pd.read_csv(self.ini['Paths']['biomet_data'])
         self.biometTraces = biometData.columns
         
-        self.dataValues = {}
-
         self.getCal = rLCF.read_LI_Config()
 
     def process_file(self,input,Template_File=True,Testing=False):
-        self.EV = eL()
+        self.dataValues = {}
+        self.EV = eL(classes=['Flag','Update','Failed_to_Parse'])
         self.Template_File_Available = Template_File
         self.filename = input[0]
         self.TimeStamp = input[1]
         self.fullFile = self.ini['Paths']['dpath']+'/'+self.filename
         self.filename, self.file_type = self.filename.rsplit('.',1)
-        if self.file_type == 'ghg':
-            with zipfile.ZipFile(self.fullFile, 'r') as ghgZip:
-                self.whichFiles(ghgZip.namelist())
-                self.Template_File_Available = self.Parse_Metadata(TextIOWrapper(ghgZip.open(self.ghgFiles['metadata']), 'utf-8'),self.Template_File_Available)
-                if ~hasattr(self, 'data_columns'):
-                    self.readHeader(ghgZip.open(self.ghgFiles['data']))
-                self.read_dat(ghgZip.open(self.ghgFiles['data']))
-                # Read the calibration config data (only do one per day for expedience)
-                if self.ini['Calibration_Info']['read_Cal'] == 'True' and (self.TimeStamp.strftime('%H:%M') == '00:00' or Testing == True):
-                    if len(self.ghgFiles['system_config']['xmlFiles'])>0:
-                        for i, f in enumerate(self.ghgFiles['system_config']['xmlFiles']):
-                            self.getCal.readXML(ET.parse(ghgZip.open(f)),i,self.TimeStamp)
-                    elif self.ghgFiles['system_config']['co2app'] != '':
-                        # Read the co2app file (and header info) - only useful if there is a 7200
-                        self.getCal.readConfig(ghgZip.open(self.ghgFiles['system_config']['co2app']).read().decode("utf-8"),self.TimeStamp)
-                    else:
-                        self.EV.updateLog('Calibration','Missing','Flag')
+        try:
+            if self.file_type == 'ghg':
+                with zipfile.ZipFile(self.fullFile, 'r') as ghgZip:
+                    self.whichFiles(ghgZip.namelist())
+                    self.Template_File_Available = self.Parse_Metadata(TextIOWrapper(ghgZip.open(self.ghgFiles['metadata']), 'utf-8'),self.Template_File_Available)
+                    if ~hasattr(self, 'data_columns'):
+                        self.readHeader(ghgZip.open(self.ghgFiles['data']))
+                    self.read_dat(ghgZip.open(self.ghgFiles['data']))
+                    # Read the calibration config data (only do one per day for expedience)
+                    if self.ini['Calibration_Info']['read_Cal'] == 'True' and (self.TimeStamp.strftime('%H:%M') == '00:00' or Testing == True):
+                        if len(self.ghgFiles['system_config']['xmlFiles'])>0:
+                            for i, f in enumerate(self.ghgFiles['system_config']['xmlFiles']):
+                                self.getCal.readXML(ET.parse(ghgZip.open(f)),i,self.TimeStamp)
+                        elif self.ghgFiles['system_config']['co2app'] != '':
+                            # Read the co2app file (and header info) - only useful if there is a 7200
+                            self.getCal.readConfig(ghgZip.open(self.ghgFiles['system_config']['co2app']).read().decode("utf-8"),self.TimeStamp)
+                        else:
+                            self.EV.updateLog('Calibration','Missing','Flag')
 
-            # self.EV.cleanLog(self.TimeStamp)
-        else:
-            templateFiles = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*.metadata")]
-            templateFiles.sort()
-            self.Parse_Metadata(open(templateFiles[-1]),self.Template_File_Available)
-            self.readHeader(self.fullFile)
-            self.read_dat(self.fullFile)
-            # self.EV.cleanLog(self.TimeStamp)
-            self.Metadata_Filename = os.path.basename(templateFiles[-1])
-        if Testing == True:
-            print({'TimeStamp':self.TimeStamp,
-                # 'dataValues':self.dataValues.copy(),
-                'MetadataFile':self.Metadata_Filename,
-                # 'Update':self.EV.dfLog['Update'].copy(),
-                # 'Flag':self.EV.dfLog['Flag'].copy(),
-                # 'calData':self.getCal.calData.copy(),
-                'Updated':self.Template_File_Available})
+            else:
+                templateFiles = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*.metadata")]
+                templateFiles.sort()
+                self.Parse_Metadata(open(templateFiles[-1]),self.Template_File_Available)
+                self.readHeader(self.fullFile)
+                self.read_dat(self.fullFile)
+                # self.EV.cleanLog(self.TimeStamp)
+                self.Metadata_Filename = os.path.basename(templateFiles[-1])
+            if Testing == True:
+                print({'TimeStamp':self.TimeStamp,
+                    'MetadataFile':self.Metadata_Filename,
+                    'Updated':self.Template_File_Available})
+        except:
+            e = (traceback.format_exc())
+            self.EV.updateLog(f"Traceback ",e,'Failed_to_Parse')
+            self.Metadata_Filename = ''
+            pass
         return({'TimeStamp':self.TimeStamp,
                 'dataValues':self.dataValues.copy(),
                 'MetadataFile':self.Metadata_Filename,
                 'Log':self.EV.Log,
-                # 'Update':self.EV.Log['Update'],
-                # 'Flag':self.EV.Log['Flag'],
-                # 'Update':self.EV.dfLog['Update'].copy(),
-                # 'Flag':self.EV.dfLog['Flag'].copy(),
                 'calData':self.getCal.calData.copy(),
                 'Updated':self.Template_File_Available})
 
