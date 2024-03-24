@@ -43,7 +43,7 @@ class Parse():
 
     def process_file(self,input,Template_File=True,Testing=False):
         self.dataValues = {}
-        self.EV = eL(classes=['Flag','Update','Failed_to_Parse'])
+        self.EV = eL(classes=['Flag','Update','Failed_to_Parse','Cal_info'])
         self.Template_File_Available = Template_File
         self.filename = input[0]
         self.TimeStamp = input[1]
@@ -66,7 +66,7 @@ class Parse():
                             # Read the co2app file (and header info) - only useful if there is a 7200
                             self.getCal.readConfig(ghgZip.open(self.ghgFiles['system_config']['co2app']).read().decode("utf-8"),self.TimeStamp)
                         else:
-                            self.EV.updateLog('Calibration','Missing','Flag')
+                            self.EV.updateLog('Calibration','Missing','Cal_info')
 
             else:
                 templateFiles = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*.metadata")]
@@ -78,13 +78,15 @@ class Parse():
                 self.Metadata_Filename = os.path.basename(templateFiles[-1])
             if Testing == True:
                 print({'TimeStamp':self.TimeStamp,
-                    'MetadataFile':self.Metadata_Filename,
-                    'Updated':self.Template_File_Available})
+                    'MetadataFile':self.Metadata_Filename},
+                    'Log',self.EV.Log)
         except:
             e = (traceback.format_exc())
             self.EV.updateLog(f"Traceback ",e,'Failed_to_Parse')
             self.Metadata_Filename = ''
             pass
+        if self.EV.Log['Flag'] == '':
+            self.EV.Log['Flag'] = 'No Issues'
         return({'TimeStamp':self.TimeStamp,
                 'dataValues':self.dataValues.copy(),
                 'MetadataFile':self.Metadata_Filename,

@@ -198,7 +198,6 @@ class read_ALL():
             # Sequential processing is helpful for trouble shooting but will run much slower
             else:
                 for fn,ts in zip(NameList,TimeList):
-                    print(ts)
                     out = self.Parser.process_file([fn,ts],Testing=True)
                     self.appendRecs(out)
                     self.out = out
@@ -278,6 +277,12 @@ class read_ALL():
                 (self.files['setup_ID']==i[1])&
                 (self.files['name_pattern']==i[2])
                 ),'MetaDataFile']=row['MetaDataFile']
+            
+            # self.files.loc[(
+            #     (self.files['MetaDataFile']==i[0])&
+            #     (self.files['setup_ID']==i[1])&
+            #     (self.files['name_pattern']==i[2])
+            #     ),'MetaDataFile']=row['MetaDataFile']
         for rem in toRemove:
             if os.path.isfile(f"{self.ini['Paths']['meta_dir']}{rem}"):
                 os.remove(f"{self.ini['Paths']['meta_dir']}{rem}")

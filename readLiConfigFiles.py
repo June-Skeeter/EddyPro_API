@@ -3,7 +3,6 @@ import json
 import numpy as np
 import configparser
 import pandas as pd
-from HelperFunctions import EventLog as eL
 
 def getTime(Time,fmt = 'epoch'):
     try:
@@ -20,11 +19,7 @@ class read_LI_Config():
     # Unless dealing with xml format - the all values are saved
     # Only available for 7500 so far?
 
-    def __init__(self,ini_file='ini_files/ReadLiConfigFiles.ini'):#,Log=None
-        # if Log == None:
-        #     self.EV = el.EventLog()
-        # else:
-        #     self.EV = Log
+    def __init__(self,ini_file='ini_files/ReadLiConfigFiles.ini'):
             
         self.calData = pd.DataFrame()
 
@@ -75,7 +70,6 @@ class read_LI_Config():
             self.parsedConfig[key]={section: dict(config[section]) for section in config.sections()}
         except:
             pass
-            # self.EV.updateLog('Calibration',f'Unable to Parse {key} from .conf','Flag')
 
     def readXML(self,file,i,TimeStamp):
         with open(self.ini_XML['calibrate_map']) as json_file:
