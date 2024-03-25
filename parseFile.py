@@ -28,7 +28,7 @@ class Parse():
         self.ini = ini
         self.max_missing = float(eval(self.ini['RawProcess_Settings']['max_lack']))*.01
         self.Vars = configparser.ConfigParser()
-        self.Vars.read_file(open(self.ini['templates']['VariableList']))
+        self.Vars.read_file(open(self.ini['templates']['variableList']))
 
         if os.path.isfile(self.ini['filenames']['metadata_to_overwrite']):
             self.UpdateMetadata = pd.read_csv(self.ini['filenames']['metadata_to_overwrite'],parse_dates={'Start':['TIMESTAMP_Start'],'End':['TIMESTAMP_End']})
@@ -36,7 +36,7 @@ class Parse():
             self.UpdateMetadata.reset_index(inplace=True)
             self.UpdateMetadata.set_index(['Start','End','index'],inplace=True)
 
-        biometData = pd.read_csv(self.ini['Paths']['biomet_data'])
+        biometData = pd.read_csv(self.ini['Paths']['biomet_path'])
         self.biometTraces = biometData.columns
         
         self.getCal = rLCF.read_LI_Config()
@@ -47,7 +47,7 @@ class Parse():
         self.Template_File_Available = Template_File
         self.filename = input[0]
         self.TimeStamp = input[1]
-        self.fullFile = self.ini['Paths']['dpath']+'/'+self.filename
+        self.fullFile = self.ini['Paths']['raw_path']+'/'+self.filename
         self.filename, self.file_type = self.filename.rsplit('.',1)
         try:
             if self.file_type == 'ghg':
@@ -58,7 +58,7 @@ class Parse():
                         self.readHeader(ghgZip.open(self.ghgFiles['data']))
                     self.read_dat(ghgZip.open(self.ghgFiles['data']))
                     # Read the calibration config data (only do one per day for expedience)
-                    if self.ini['Calibration_Info']['read_Cal'] == 'True' and (self.TimeStamp.strftime('%H:%M') == '00:00' or Testing == True):
+                    if self.ini['Calibration_Info']['readCal'] == True and (self.TimeStamp.strftime('%H:%M') == '00:00' or Testing == True):
                         if len(self.ghgFiles['system_config']['xmlFiles'])>0:
                             for i, f in enumerate(self.ghgFiles['system_config']['xmlFiles']):
                                 self.getCal.readXML(ET.parse(ghgZip.open(f)),i,self.TimeStamp)
@@ -74,14 +74,15 @@ class Parse():
                 self.Parse_Metadata(open(templateFiles[-1]),self.Template_File_Available)
                 self.readHeader(self.fullFile)
                 self.read_dat(self.fullFile)
-                # self.EV.cleanLog(self.TimeStamp)
                 self.Metadata_Filename = os.path.basename(templateFiles[-1])
             if Testing == True:
                 print({'TimeStamp':self.TimeStamp,
                     'MetadataFile':self.Metadata_Filename},
                     'Log',self.EV.Log)
         except:
-            e = (traceback.format_exc())
+            e = (traceback.format_exc())            
+            if Testing == True:
+                print(e)
             self.EV.updateLog(f"Traceback ",e,'Failed_to_Parse')
             self.Metadata_Filename = ''
             pass

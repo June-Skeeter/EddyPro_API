@@ -6,14 +6,15 @@ import pandas as pd
 # substitute keys in a path with corresponding path_strings from a class object 
 # remove from the path if it doesn't exist
 
-def sub_path(class_object,path_string):
+def sub_path(class_dict,path_string):
 
-    sub_patterns = ['read_data_dir','write_data_dir','year','month','siteID','dateStr','name']
-    for sub in sub_patterns:
-        if hasattr(class_object, sub):
-            path_string = path_string.replace(f'**{sub}**',str(class_object.__getattribute__(sub))).replace('None','')
-        else:
-            path_string = path_string.replace(f'**{sub}**','')
+    for i in range(2):
+        for sub in class_dict.keys():
+            try:
+                path_string = path_string.replace(f'**{sub}**',f'{class_dict[sub]}')#.replace('None','')
+            except:
+                pass
+                path_string = path_string.replace(f'**{sub}**','')
     
     path_string = path_string.replace('//','/')
     path_string = path_string.replace('\\\\','\\')

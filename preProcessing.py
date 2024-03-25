@@ -3,27 +3,26 @@
 
 import os
 import re
+import sys
+import yaml
+import time
 import shutil
 import argparse
-import configparser
+import parseFile
+import importlib
 import numpy as np
 import pandas as pd
+import configparser
 from pathlib import Path
-from HelperFunctions import sub_path
-from multiprocessing import Pool
-from HelperFunctions import progressbar
-import parseFile
-import sys
-import importlib
 from datetime import datetime
-import time
+from multiprocessing import Pool
+from HelperFunctions import sub_path
+from HelperFunctions import progressbar
 importlib.reload(parseFile)
 
 class read_ALL():
-    def __init__(self,siteID,Year,Month,processes=1,reset=0,Test=0,file_type='ghg',copy_From=None,copy_tag='',metadata_template=[],metadata_updates=None):
+    def __init__(self,siteID,reset=0,file_type='ghg',copy_From=None,copy_tag='',metadata_template=[],metadata_updates=None):
         self.file_type=file_type
-        self.year = str(Year)
-        self.month = "{:02d}".format(Month)
         self.siteID = siteID
         self.copy_From = copy_From
         self.copy_tag = copy_tag
@@ -33,25 +32,45 @@ class read_ALL():
         ini_file = ['ini_files/'+ini for ini in inis]
         self.ini = configparser.ConfigParser()
         self.ini.read(ini_file)
-        self.read_data_dir = sub_path(self,self.ini['Paths']['read_data_dir'])
+
+        self.ini = {key:dict(self.ini[key]) for key in self.ini.keys()}
+
+        ymls = ['ini_files/_config.yml']
+        for y in ymls:
+            with open(y) as yml:
+                self.ini.update(yaml.safe_load(yml))
         
-        # Create directories from template (see configuration.ini)
-        self.ini['Paths']['dpath'] = sub_path(self,self.ini['Paths']['raw'])
-        self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
-        self.ini['Paths']['biomet_data'] = sub_path(self,self.ini['Paths']['biomet']+self.ini['filenames']['biomet'])
+        # print(self.ini['Paths']['Substitutions'])
+        class_dict = self.__dict__
+        class_dict.update(self.ini['Paths']['Substitutions'])
+
+        time_invariant = {}
+        for key,path in self.ini['Paths'].items():
+            if isinstance(path,str):
+                self.ini['Paths'][key] = sub_path(self.__dict__,path)
+                time_invariant[key] = self.ini['Paths'][key]
+        self.ini['Paths']['time_invariant'] = time_invariant
+
         if metadata_updates is not None:
-            self.ini['filenames']['metadata_to_overwrite'] = sub_path(self,metadata_updates)
-        
+            self.ini['filenames']['metadata_to_overwrite'] = sub_path(self.__dict__,metadata_updates)
+
+        # # Create directories from template (see configuration.ini)
+        # self.ini['Paths']['raw_path'] = sub_path(self.__dict__,self.ini['Paths']['raw'])
+        # print(self.ini['Paths']['metadata'])
+        # self.ini['Paths']['meta_dir'] = sub_path(self.__dict__,self.ini['Paths']['metadata'])
+        # print(self.ini['Paths']['meta_dir'])
+        # self.ini['Paths']['biomet_path'] = sub_path(self.__dict__,self.ini['Paths']['biomet']+self.ini['filenames']['biomet'])
+
 
         if reset == 1:
-            proceed = input(f"Warning: You are about to complete a hard reset, deleting all contents of: {self.ini['Paths']['meta_dir']}\nDo you wish to proceed? Y/N")
-            if proceed.lower() == 'y' and os.path.isdir(self.ini['Paths']['meta_dir']):
-                print(f"Deleting all contents of: {self.ini['Paths']['meta_dir']}")
-                shutil.rmtree(self.ini['Paths']['meta_dir'])
-                time.sleep(1)
-            else:
-                print(f"Keeping contents of: {self.ini['Paths']['meta_dir']}")
-            
+            proceed = input(f"Warning: You are about to complete a hard reset, deleting all contents of: {self.ini['Paths']['meta_dir']}\nHit enter to proceed, type any other key + enter to escape? Y/N")
+            if proceed != '':
+                sys.exit()
+    
+            print(f"Deleting all contents of: {self.ini['Paths']['meta_dir']}")
+            shutil.rmtree(self.ini['Paths']['meta_dir'])
+            time.sleep(1)
+        
         if not os.path.exists(self.ini['Paths']['meta_dir']):
             Path(self.ini['Paths']['meta_dir']).mkdir(parents=True, exist_ok=True)
             time.sleep(1)
@@ -66,29 +85,35 @@ class read_ALL():
         self.Logs = []
         
         # Check for new .files - or overwrite if reset flag is set to true
-        self.find_files(reset)
-        self.Parser = parseFile.Parse(self.ini)
-        if hasattr(self, 'files'):
-            if self.files.loc[self.files.index.month==int(self.month)].size>0:
-                self.Read(processes,Test,reset)
+        # self.find_files(reset)
+        # if hasattr(self, 'files'):
+        #     if self.files.loc[self.files.index.month==int(self.month)].size>0:
+        #         self.Read(processes,Test,reset)
 
 
-    def find_files (self,reset=0):
+    def find_files (self,Year,Month,reset=0):
         # Find the name of every FULL file in the raw data folder located at the end of directory tree
         # Exclude any files that fall off half hourly intervals ie. maintenance
         # Resample to 30 min intervals - missing filenames will be null
         # Save the list of files
+        
+        self.year = str(Year)
+        self.month = "{:02d}".format(Month)
+        
+        for key,path in self.ini['Paths'].items():
+            if isinstance(path,str):
+                self.ini['Paths'][key]=sub_path(self.__dict__,self.ini['Paths']['time_invariant'][key])
 
         # Get every file that is at the end of a directory tree
         all_files = []
         TIMESTAMP = []
         name_pattern = []
         if self.copy_From is not None:
-            if os.path.isdir(self.ini['Paths']['dpath']) == False:
-                os.makedirs(self.ini['Paths']['dpath'])
+            if os.path.isdir(self.ini['Paths']['raw_path']) == False:
+                os.makedirs(self.ini['Paths']['raw_path'])
             self.setup()
-        if os.path.isdir(self.ini['Paths']['dpath']):
-            for file in os.listdir(self.ini['Paths']['dpath']):
+        if os.path.isdir(self.ini['Paths']['raw_path']):
+            for file in os.listdir(self.ini['Paths']['raw_path']):
                 if file.endswith(self.file_type):
                     name = file.rsplit('.',1)[0]
                     all_files.append(file)
@@ -108,26 +133,29 @@ class read_ALL():
                 for i,row in df.loc[((df['Flag']=='Incomplete Record')&(~df['filename'].str.contains('_incomplete')))].iterrows():
                     old_fn = row['filename']
                     new_fn = df.loc[df.index==i,'filename']=old_fn.split('.')[0]+'_incomplete.'+old_fn.split('.')[1]
-                    if os.path.isfile(f"{self.ini['Paths']['dpath']}/{new_fn}"):
-                        os.remove(f"{self.ini['Paths']['dpath']}/{new_fn}")
-                    os.rename(f"{self.ini['Paths']['dpath']}/{old_fn}",f"{self.ini['Paths']['dpath']}/{new_fn}")
+                    if os.path.isfile(f"{self.ini['Paths']['raw_path']}/{new_fn}"):
+                        os.remove(f"{self.ini['Paths']['raw_path']}/{new_fn}")
+                    os.rename(f"{self.ini['Paths']['raw_path']}/{old_fn}",f"{self.ini['Paths']['raw_path']}/{new_fn}")
                     
                 # Resample to get timestamp on consistent half-hourly intervals
                 df = df.resample('30T').first()
-                # Write new file or append to existing file
-                if reset == 1 or os.path.isfile(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory']) == False:
-                    # Sort so that oldest files get processed first
-                    self.files = df.sort_index()#ascending=False)
-                    self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
-                else:
+
+                # Append to existing file or write new file
+                try:
                     self.files = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
                     self.files = pd.concat([self.files,df.loc[df.index.isin(self.files.index)==False]])
                     # Resample to get timestamp on consistent half-hourly intervals
                     self.files = self.files.resample('30T').asfreq()
                     # Sort so that oldest files get processed first
                     self.files = self.files.sort_index()#ascending=False)
+                except:
+                    # Sort so that oldest files get processed first
+                    self.files = df.sort_index()#ascending=False)
+                    self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
         else:
-            print(f"Not a valid directory: {self.ini['Paths']['dpath']}")
+            print(f"Not a valid directory: {self.ini['Paths']['raw_path']}")
+    
+        self.Parser = parseFile.Parse(self.ini)
 
     def setup(self):
         for dir, _, files in os.walk(self.copy_From):
@@ -135,12 +163,12 @@ class read_ALL():
                 pb = progressbar(len(files),'Copying Files')
                 for file in files:
                     pb.step()
-                    if file.endswith(self.file_type) and self.copy_tag in file and os.path.isfile(f"{self.ini['Paths']['dpath']}/{file}") == False:
+                    if file.endswith(self.file_type) and self.copy_tag in file and os.path.isfile(f"{self.ini['Paths']['raw_path']}/{file}") == False:
                         srch = re.search(self.ini[self.file_type]['search'], file).group(0)
                         if srch is not None:
                             TIMESTAMP =  datetime.strptime(srch,self.ini[self.file_type]['format'])
                             if str(TIMESTAMP.year) == self.year and str(TIMESTAMP.month).zfill(2) == self.month:
-                                shutil.copy(f"{dir}/{file}",f"{self.ini['Paths']['dpath']}/{file}")
+                                shutil.copy(f"{dir}/{file}",f"{self.ini['Paths']['raw_path']}/{file}")
                 pb.close()
 
 
@@ -150,14 +178,16 @@ class read_ALL():
         empty.index.name=ixName
         return(empty)
     
-    def Read(self,processes,Test,reset):
+    def Read(self,processes=os.cpu_count(),Test=0):
         # Read existing data records if they exist, create empty ones if they don't exist
-        if reset == 0 and os.path.isfile(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means']):
+        try:
             self.dataRecords = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
             self.dynamic_metadata = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['dynamic_metadata'],parse_dates={'TIMESTAMP':['date','time']},index_col='TIMESTAMP')
             self.site_setup = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['site_setup'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
             self.Calibration = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
-        else:
+            print('Pre-existing metadata imported')
+        except:
+            print('Starting fresh run')
             self.dataRecords = self.makeEmpty(type='float')
             self.dynamic_metadata = self.makeEmpty(type='float')
             self.site_setup = self.makeEmpty(type='float')
@@ -240,7 +270,7 @@ class read_ALL():
         
         if self.ini['Monitor']['in_biomet_file'] != '':
             # Assumes using only one timestamp column in biomet.  EP does support multiple timestamp columns so could implement a more generic solution
-            self.bm = pd.read_csv(self.ini['Paths']['biomet_data'],parse_dates=[self.ini['biom_timestamp']['name']],date_format=self.ini['biom_timestamp']['format'],index_col=self.ini['biom_timestamp']['name'],skiprows=[1])
+            self.bm = pd.read_csv(self.ini['Paths']['biomet_path'],parse_dates=[self.ini['biom_timestamp']['name']],date_format=self.ini['biom_timestamp']['format'],index_col=self.ini['biom_timestamp']['name'],skiprows=[1])
             for param in self.ini['Monitor']['in_biomet_file'].split(','):
                 if param in self.bm:
                     ow = self.bm.loc[self.bm.index.isin(self.dynamic_metadata.index),param]
