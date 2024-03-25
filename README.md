@@ -18,8 +18,10 @@ The EddyPro API (Application Program Interfae) is a python wrapper for the EddyP
 
 ## For Winmet
 
-> Set-ExecutionPolicy Unrestricted -Scope Process
-> PS C:\Users\labuser\EddyPro_API\.venv\Scripts> .\Activate.ps1
+```
+Set-ExecutionPolicy Unrestricted -Scope Process
+.\.venv\Scripts\activate
+```
 
 ## Workflow
 
