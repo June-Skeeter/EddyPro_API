@@ -13,6 +13,7 @@ import importlib
 import numpy as np
 import pandas as pd
 import configparser
+import db_root as db
 from pathlib import Path
 from datetime import datetime
 from multiprocessing import Pool
@@ -29,11 +30,13 @@ class read_ALL():
 
         # Concatenate and read the ini files
         inis = ['Metadata_Instructions.ini','EP_Dynamic_Updates.ini']
+
         ini_file = ['ini_files/'+ini for ini in inis]
         self.ini = configparser.ConfigParser()
         self.ini.read(ini_file)
 
         self.ini = {key:dict(self.ini[key]) for key in self.ini.keys()}
+        self.ini.update(db.config)
 
         ymls = ['ini_files/_config.yml']
         for y in ymls:
@@ -42,6 +45,7 @@ class read_ALL():
         
         # print(self.ini['Paths']['Substitutions'])
         class_dict = self.__dict__
+        class_dict.update(self.ini['RootDirs'])
         class_dict.update(self.ini['Paths']['Substitutions'])
 
         time_invariant = {}
@@ -257,7 +261,11 @@ class read_ALL():
         
         if self.ini['Monitor']['in_biomet_file'] != '':
             # Assumes using only one timestamp column in biomet.  EP does support multiple timestamp columns so could implement a more generic solution
-            self.bm = pd.read_csv(self.ini['Paths']['biomet_path'],parse_dates=[self.ini['biom_timestamp']['name']],date_format=self.ini['biom_timestamp']['format'],index_col=self.ini['biom_timestamp']['name'],skiprows=[1])
+            self.bm = pd.read_csv(self.ini['Paths']['biomet_path']+self.ini['filenames']['biomet_file'],
+                                  parse_dates=[self.ini['biom_timestamp']['name']],
+                                  date_format=self.ini['biom_timestamp']['format'],
+                                  index_col=self.ini['biom_timestamp']['name'],
+                                  skiprows=[1])
             for param in self.ini['Monitor']['in_biomet_file'].split(','):
                 if param in self.bm:
                     ow = self.bm.loc[self.bm.index.isin(self.dynamic_metadata.index),param]

@@ -36,7 +36,7 @@ class Parse():
             self.UpdateMetadata.reset_index(inplace=True)
             self.UpdateMetadata.set_index(['Start','End','index'],inplace=True)
 
-        biometData = pd.read_csv(self.ini['Paths']['biomet_path'])
+        biometData = pd.read_csv(self.ini['Paths']['biomet_path']+self.ini['filenames']['biomet_file'])
         self.biometTraces = biometData.columns
         
         self.getCal = rLCF.read_LI_Config()

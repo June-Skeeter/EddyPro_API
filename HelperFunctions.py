@@ -8,7 +8,7 @@ import pandas as pd
 
 def sub_path(class_dict,path_string):
 
-    for i in range(2):
+    for i in range(3):
         for sub in class_dict.keys():
             try:
                 path_string = path_string.replace(f'**{sub}**',f'{class_dict[sub]}')#.replace('None','')

@@ -4,20 +4,18 @@
 import os
 import sys
 import yaml
+import time
 import runEP
 import shutil
 import argparse
-import configparser
+import importlib
 import numpy as np
 import pandas as pd
+import configparser
+import db_root as db
 import multiprocessing
-from multiprocessing import Pool
 from datetime import datetime
-import time
-
-import importlib
-importlib.reload(runEP)
-
+from multiprocessing import Pool
 from HelperFunctions import progressbar, sub_path
 
 class makeRun():
@@ -32,16 +30,14 @@ class makeRun():
 
         self.DeBug = testing
         
-        # inis = ['configuration.ini']
-        # ini_file = ['ini_files/'+ini for ini in inis]
-        # self.ini = configparser.ConfigParser()
-        # self.ini.read(ini_file)
         self.ini = {}
         ymls = ['ini_files/_config.yml']
         for y in ymls:
             with open(y) as yml:
                 self.ini.update(yaml.safe_load(yml))
         
+        self.ini.update(db.config)
+
         self.siteID = siteID
 
         # Template file to be filled updated
@@ -60,7 +56,9 @@ class makeRun():
         # self.ini['Paths']['meta_dir'] = sub_path(self.__dict__,self.ini['Paths']['metadata'])
         
         class_dict = self.__dict__
+        class_dict.update(self.ini['RootDirs'])
         class_dict.update(self.ini['Paths']['Substitutions'])
+        
         time_invariant = {}
         for key,path in self.ini['Paths'].items():
             if isinstance(path,str):

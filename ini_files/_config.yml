@@ -2,18 +2,18 @@
 Paths:
   Substitutions:
   # Patterns given between ** ** can be replaced dynamically (see HelperFunctions.py)
-    read_data_dir: Y:/**siteID**/
-    write_data_dir: C:/Users/labuser/EP_API_Testing/**siteID**/
+    read_data_dir: '**Highfreq**/**siteID**/'
+    write_data_dir: '**LocalOutputs**/EP_API_Testing/**siteID**/'
     
   raw_path: '**read_data_dir**/raw/**year**/**month**/'
   biomet_path: '**read_data_dir**/biomet/**year**/'
   # processed data output
   meta_dir: '**write_data_dir**/metadata/'
   eddypro_output: '**write_data_dir**/EP_Test_Runs/'
-  eddypro_installation: C:/Program Files/LI-COR/EddyPro-7.0.9/bin/
 
 filenames:
   file_inventory: fileInventory.csv
+  biomet_file: Biomet.csv
   raw_means: rawMeans.csv
   dynamic_metadata: dynamicMetadata.csv
   site_setup: siteSetup.csv
