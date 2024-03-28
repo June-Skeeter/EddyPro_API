@@ -28,7 +28,7 @@ class read_ALL():
         self.copy_tag = copy_tag
 
         # Concatenate and read the ini files
-        inis = ['configuration.ini','Metadata_Instructions.ini','EP_Dynamic_Updates.ini']
+        inis = ['Metadata_Instructions.ini','EP_Dynamic_Updates.ini']
         ini_file = ['ini_files/'+ini for ini in inis]
         self.ini = configparser.ConfigParser()
         self.ini.read(ini_file)
@@ -47,23 +47,15 @@ class read_ALL():
         time_invariant = {}
         for key,path in self.ini['Paths'].items():
             if isinstance(path,str):
-                self.ini['Paths'][key] = sub_path(self.__dict__,path)
+                self.ini['Paths'][key] = sub_path(class_dict,path)
                 time_invariant[key] = self.ini['Paths'][key]
         self.ini['Paths']['time_invariant'] = time_invariant
 
         if metadata_updates is not None:
             self.ini['filenames']['metadata_to_overwrite'] = sub_path(self.__dict__,metadata_updates)
 
-        # # Create directories from template (see configuration.ini)
-        # self.ini['Paths']['raw_path'] = sub_path(self.__dict__,self.ini['Paths']['raw'])
-        # print(self.ini['Paths']['metadata'])
-        # self.ini['Paths']['meta_dir'] = sub_path(self.__dict__,self.ini['Paths']['metadata'])
-        # print(self.ini['Paths']['meta_dir'])
-        # self.ini['Paths']['biomet_path'] = sub_path(self.__dict__,self.ini['Paths']['biomet']+self.ini['filenames']['biomet'])
-
-
-        if reset == 1:
-            proceed = input(f"Warning: You are about to complete a hard reset, deleting all contents of: {self.ini['Paths']['meta_dir']}\nHit enter to proceed, type any other key + enter to escape? Y/N")
+        if reset == 1 and os.path.isdir(self.ini['Paths']['meta_dir']):
+            proceed = input(f"Warning: You are about to complete a hard reset, deleting all contents of: {self.ini['Paths']['meta_dir']}\nHit enter to proceed, type any other key + enter to escape?")
             if proceed != '':
                 sys.exit()
     
@@ -84,14 +76,7 @@ class read_ALL():
         time.sleep(1)
         self.Logs = []
         
-        # Check for new .files - or overwrite if reset flag is set to true
-        # self.find_files(reset)
-        # if hasattr(self, 'files'):
-        #     if self.files.loc[self.files.index.month==int(self.month)].size>0:
-        #         self.Read(processes,Test,reset)
-
-
-    def find_files (self,Year,Month,reset=0):
+    def find_files (self,Year,Month,reset=0,processes=os.cpu_count(),Test=0):
         # Find the name of every FULL file in the raw data folder located at the end of directory tree
         # Exclude any files that fall off half hourly intervals ie. maintenance
         # Resample to 30 min intervals - missing filenames will be null
@@ -156,6 +141,8 @@ class read_ALL():
             print(f"Not a valid directory: {self.ini['Paths']['raw_path']}")
     
         self.Parser = parseFile.Parse(self.ini)
+        if hasattr(self, 'files'):
+            self.Read(processes,Test)
 
     def setup(self):
         for dir, _, files in os.walk(self.copy_From):

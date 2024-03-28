@@ -3,6 +3,7 @@
 
 import os
 import sys
+import yaml
 import runEP
 import shutil
 import argparse
@@ -31,10 +32,15 @@ class makeRun():
 
         self.DeBug = testing
         
-        inis = ['configuration.ini']
-        ini_file = ['ini_files/'+ini for ini in inis]
-        self.ini = configparser.ConfigParser()
-        self.ini.read(ini_file)
+        # inis = ['configuration.ini']
+        # ini_file = ['ini_files/'+ini for ini in inis]
+        # self.ini = configparser.ConfigParser()
+        # self.ini.read(ini_file)
+        self.ini = {}
+        ymls = ['ini_files/_config.yml']
+        for y in ymls:
+            with open(y) as yml:
+                self.ini.update(yaml.safe_load(yml))
         
         self.siteID = siteID
 
@@ -49,9 +55,18 @@ class makeRun():
         # Parameters to update in template
         self.epDataCols = configparser.ConfigParser()
 
-        self.read_data_dir = self.ini['Paths']['read_data_dir']
-        self.write_data_dir = self.ini['Paths']['write_data_dir']
-        self.ini['Paths']['meta_dir'] = sub_path(self,self.ini['Paths']['metadata'])
+        # self.read_data_dir = self.ini['Paths']['read_data_dir']
+        # self.write_data_dir = self.ini['Paths']['write_data_dir']
+        # self.ini['Paths']['meta_dir'] = sub_path(self.__dict__,self.ini['Paths']['metadata'])
+        
+        class_dict = self.__dict__
+        class_dict.update(self.ini['Paths']['Substitutions'])
+        time_invariant = {}
+        for key,path in self.ini['Paths'].items():
+            if isinstance(path,str):
+                self.ini['Paths'][key] = sub_path(class_dict,path)
+                time_invariant[key] = self.ini['Paths'][key]
+        self.ini['Paths']['time_invariant'] = time_invariant
 
         self.inventory = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
         self.inventory = self.inventory.loc[((self.inventory['filename'].isna()==False)&(self.inventory['MetaDataFile'].isna()==False))].copy()
@@ -60,7 +75,7 @@ class makeRun():
         self.runList = []
         self.epRun['Project']['project_title']=self.name
         # Simple/tidy procedure for testing - replace with more secure process that doesn't overwrite outputs
-        self.output_path = sub_path(self,self.ini['Paths']['eddypro_output']) 
+        self.output_path = sub_path(self.__dict__,self.ini['Paths']['eddypro_output']) 
         if os.path.isdir(self.output_path):
             if len(os.listdir(self.output_path)) >= 0:
                 input("Warning: Output directory is not empty.  Move files before running or they will be deleted.  Press any key to continue:")
