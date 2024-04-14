@@ -51,10 +51,6 @@ class makeRun():
         # Parameters to update in template
         self.epDataCols = configparser.ConfigParser()
 
-        # self.read_data_dir = self.ini['Paths']['read_data_dir']
-        # self.write_data_dir = self.ini['Paths']['write_data_dir']
-        # self.ini['Paths']['meta_dir'] = sub_path(self.__dict__,self.ini['Paths']['metadata'])
-        
         class_dict = self.__dict__
         class_dict.update(self.ini['RootDirs'])
         class_dict.update(self.ini['Paths']['Substitutions'])
@@ -259,6 +255,8 @@ class makeRun():
                 fn = f'{self.output_path}eddypro_{self.name}_{start}_{end}{m}{rt}_adv.csv'
                 fullFile.to_csv(fn,index=False)
                 self.all_outputs[m.replace('_','')]=fn
+
+
 
 # If called from command line ...
 if __name__ == '__main__':
