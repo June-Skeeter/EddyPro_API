@@ -176,7 +176,7 @@ class makeRun():
                     bin = cwd+f'/temp/{thread.pid}/bin/'
                     ini = cwd+f'/temp/{thread.pid}/ini/'
 
-                    shutil.copytree(self.ini['Paths']['eddypro_installation'],bin)
+                    shutil.copytree(self.ini['RootDirs']['EddyPro'],bin)
 
                     batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
                     with open(batchFile, 'w') as batch:                        
