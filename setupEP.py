@@ -31,7 +31,7 @@ class makeRun():
         self.DeBug = testing
         
         self.ini = {}
-        ymls = ['ini_files/_config.yml']
+        ymls = ['_config.yml']
         for y in ymls:
             with open(y) as yml:
                 self.ini.update(yaml.safe_load(yml))
@@ -65,6 +65,11 @@ class makeRun():
         self.inventory = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
         self.inventory = self.inventory.loc[((self.inventory['filename'].isna()==False)&(self.inventory['MetaDataFile'].isna()==False))].copy()
     
+    def updateTemplate(self,updates):
+        for key,val in updates.items():
+            for k,v in val.items():
+                self.epUpdate[key][k]=str(v)
+
     def runDates(self,dateRange):
         self.runList = []
         self.epRun['Project']['project_title']=self.name

@@ -8,7 +8,7 @@ import yaml
 import time
 import shutil
 import argparse
-import parseFile
+import handleFiles
 import importlib
 import numpy as np
 import pandas as pd
@@ -16,17 +16,17 @@ import configparser
 import db_root as db
 from pathlib import Path
 from datetime import datetime
+from functools import partial
 from multiprocessing import Pool
 from HelperFunctions import sub_path
 from HelperFunctions import progressbar
-importlib.reload(parseFile)
+importlib.reload(handleFiles)
 
 class read_ALL():
-    def __init__(self,siteID,reset=0,file_type='ghg',copy_From=None,copy_tag='',metadata_template=[],metadata_updates=None):
-        self.file_type=file_type
+    def __init__(self,siteID,reset=0,fileType='ghg',copyFrom=None,copyTag='',metadataTemplate=[],metadataUpdates=None,timeShift=None):
+        self.fileType=fileType
         self.siteID = siteID
-        self.copy_From = copy_From
-        self.copy_tag = copy_tag
+        self.copyFrom = copyFrom
 
         # Concatenate and read the ini files
         inis = ['Metadata_Instructions.ini','EP_Dynamic_Updates.ini']
@@ -38,12 +38,15 @@ class read_ALL():
         self.ini = {key:dict(self.ini[key]) for key in self.ini.keys()}
         self.ini.update(db.config)
 
-        ymls = ['ini_files/_config.yml']
+        ymls = ['_config.yml']
         for y in ymls:
             with open(y) as yml:
                 self.ini.update(yaml.safe_load(yml))
+                
+        # File specific operations
+        self.ini[fileType]['tag'] = copyTag
+        self.ini[fileType]['timeShift'] = timeShift
         
-        # print(self.ini['Paths']['Substitutions'])
         class_dict = self.__dict__
         class_dict.update(self.ini['RootDirs'])
         class_dict.update(self.ini['Paths']['Substitutions'])
@@ -55,8 +58,8 @@ class read_ALL():
                 time_invariant[key] = self.ini['Paths'][key]
         self.ini['Paths']['time_invariant'] = time_invariant
 
-        if metadata_updates is not None:
-            self.ini['filenames']['metadata_to_overwrite'] = sub_path(self.__dict__,metadata_updates)
+        # if metadataUpdates is not None:
+        self.ini['filenames']['metadata_to_overwrite'] = sub_path(self.__dict__,str(metadataUpdates))
 
         if reset == 1 and os.path.isdir(self.ini['Paths']['meta_dir']):
             proceed = input(f"Warning: You are about to complete a hard reset, deleting all contents of: {self.ini['Paths']['meta_dir']}\nHit enter to proceed, type any other key + enter to escape?")
@@ -72,7 +75,7 @@ class read_ALL():
             time.sleep(1)
 
         # Copy over any metadata templates
-        for md in metadata_template:
+        for md in metadataTemplate:
             if not os.path.isfile(self.ini['Paths']['meta_dir']+os.path.basename(md)):
                 print('Copying Metadata file:\n',md)
                 shutil.copy2(md,self.ini['Paths']['meta_dir'])
@@ -80,7 +83,7 @@ class read_ALL():
         time.sleep(1)
         self.Logs = []
         
-    def find_files (self,Year,Month,reset=0,processes=os.cpu_count(),Test=0):
+    def find_files(self,Year,Month,reset=0,processes=os.cpu_count(),Test=0):
         # Find the name of every FULL file in the raw data folder located at the end of directory tree
         # Exclude any files that fall off half hourly intervals ie. maintenance
         # Resample to 30 min intervals - missing filenames will be null
@@ -97,18 +100,18 @@ class read_ALL():
         all_files = []
         TIMESTAMP = []
         name_pattern = []
-        if self.copy_From is not None:
+        if self.copyFrom is not None:
             if os.path.isdir(self.ini['Paths']['raw_path']) == False:
                 os.makedirs(self.ini['Paths']['raw_path'])
-            self.setup()
+            self.copy_files(processes)
         if os.path.isdir(self.ini['Paths']['raw_path']):
             for file in os.listdir(self.ini['Paths']['raw_path']):
-                if file.endswith(self.file_type):
+                if file.endswith(self.fileType):
                     name = file.rsplit('.',1)[0]
                     all_files.append(file)
-                    timestamp_info = re.search(self.ini[self.file_type]['search'], name).group(0)
-                    TIMESTAMP.append(datetime.strptime(timestamp_info,self.ini[self.file_type]['format']))
-                    name_pattern.append(name.replace(timestamp_info,self.ini[self.file_type]['ep_date_pattern'])+'.'+self.file_type)
+                    timestamp_info = re.search(self.ini[self.fileType]['search'], name).group(0)
+                    TIMESTAMP.append(datetime.strptime(timestamp_info,self.ini[self.fileType]['format']))
+                    name_pattern.append(name.replace(timestamp_info,self.ini[self.fileType]['ep_date_pattern'])+'.'+self.fileType)
             if len(all_files)>0:
                 # Create dataframe of all GHG files
                 df = pd.DataFrame(data={'filename':all_files,'TIMESTAMP':TIMESTAMP,'name_pattern':name_pattern})
@@ -144,23 +147,26 @@ class read_ALL():
         else:
             print(f"Not a valid directory: {self.ini['Paths']['raw_path']}")
     
-        self.Parser = parseFile.Parse(self.ini)
+        self.Parser = handleFiles.Parse(self.ini)
         if hasattr(self, 'files'):
             self.Read(processes,Test)
 
-    def setup(self):
-        for dir, _, files in os.walk(self.copy_From):
+    # Copy files in parallel to speed things up
+    def copy_files(self,processes):
+        for dir, _, files in os.walk(self.copyFrom):
             if len(files)>0:
-                pb = progressbar(len(files),'Copying Files')
-                for file in files:
-                    pb.step()
-                    if file.endswith(self.file_type) and self.copy_tag in file and os.path.isfile(f"{self.ini['Paths']['raw_path']}/{file}") == False:
-                        srch = re.search(self.ini[self.file_type]['search'], file).group(0)
-                        if srch is not None:
-                            TIMESTAMP =  datetime.strptime(srch,self.ini[self.file_type]['format'])
-                            if str(TIMESTAMP.year) == self.year and str(TIMESTAMP.month).zfill(2) == self.month:
-                                shutil.copy(f"{dir}/{file}",f"{self.ini['Paths']['raw_path']}/{file}")
-                pb.close()
+                if (__name__ == 'preProcessing' or __name__ == '__main__') and processes>1:
+                    pb = progressbar(len(files),f'Copying Files ')
+                    with Pool(processes=processes) as pool:
+                        max_chunksize=4
+                        chunksize=min(int(np.ceil(len(files)/processes)),max_chunksize)
+                        for out in pool.imap(partial(handleFiles.copy_files,in_dir=dir,out_dir=self.ini['Paths']['raw_path'],fileInfo=self.ini[self.fileType],year=self.year,month=self.month),files,chunksize=chunksize):
+                            pb.step()
+                        pool.close()
+                        pb.close()
+                else:
+                    for filename in files:
+                        handleFiles.copy_files(filename,dir,self.ini['Paths']['raw_path'],fileInfo=self.ini[self.fileType],year=self.year,month=self.month)
 
 
     def makeEmpty(self,type='object',ixName='TIMESTAMP'):
@@ -186,20 +192,18 @@ class read_ALL():
 
         # Empty log for current run
         self.Log = self.makeEmpty()
-
         self.to_Process = self.files.loc[
             (
             (self.files['filename'].isnull()==False)&
             (self.files.index.month==int(self.month))&
-            self.files['setup_ID'].isna()&
-            self.files['filename'].str.endswith(self.file_type)&
+            # self.files['setup_ID'].isna()&
+            self.files['filename'].str.endswith(self.fileType)&
             (self.files['filename'].str.contains('incomplete')==False)
             )]
         if Test > 0:
             self.to_Process = self.to_Process.iloc[:Test]
         NameList = self.to_Process['filename'].values
         TimeList = self.to_Process.index
-
         if self.files.loc[self.files['MetaDataFile'].fillna('').str.contains('.metadata')].size==0:
             # Run once to get the first Metadata file and use it as a template
             self.Parser.process_file([NameList[0],TimeList[0]],Template_File=False)
@@ -282,8 +286,11 @@ class read_ALL():
         self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
 
     def GroupCommon(self):
+        self.site_setup = self.site_setup[~self.site_setup.index.duplicated()].copy()
         self.site_setup['temp_ID'] = self.site_setup.reset_index().index
         self.site_setup = self.site_setup.fillna(0)
+        # If something crashes here, its likely a result of incomplete parsing.
+        # Implement fix if crashes occur
         self.site_setup['temp_ID'] = self.site_setup.groupby(self.ini['Monitor']['site_setup'].split(','))[['temp_ID']].transform(lambda x: x.min())
         self.site_setup['setup_ID']=np.nan
         for i,val in enumerate(self.site_setup['temp_ID'].unique()):
@@ -303,11 +310,6 @@ class read_ALL():
                 (self.files['name_pattern']==i[2])
                 ),'MetaDataFile']=row['MetaDataFile']
             
-            # self.files.loc[(
-            #     (self.files['MetaDataFile']==i[0])&
-            #     (self.files['setup_ID']==i[1])&
-            #     (self.files['name_pattern']==i[2])
-            #     ),'MetaDataFile']=row['MetaDataFile']
         for rem in toRemove:
             if os.path.isfile(f"{self.ini['Paths']['meta_dir']}{rem}"):
                 os.remove(f"{self.ini['Paths']['meta_dir']}{rem}")
@@ -324,43 +326,39 @@ if __name__ == '__main__':
     # Parse the arguments
     CLI=argparse.ArgumentParser()
 
-    CLI.add_argument(
-    "--siteID", 
-    nargs='+', # 1 or more values expected => creates a list
-    type=str,
-    default=[],
-    )
-
-    CLI.add_argument(
-    "--Years",
-    nargs='+',
-    type=int,  
-    default=[datetime.now().year],
-    )
-    CLI.add_argument(
-    "--Month",
-    nargs='+',
-    type=int,  
-    default=[i+1 for i in range(12)],
-    )
-
-    CLI.add_argument(
-    "--Processes",
-    nargs="?",# Use "?" to limit to one argument instead of list of arguments
-    type=int,  
-    default=1,
-    )
+    CLI.add_argument("--siteID",nargs='+',type=str,default=[],)
     
+    CLI.add_argument("--fileType",nargs="?",type=str,default="ghg",)
+
+    CLI.add_argument("--metadataUpdates",nargs="?",type=str,default=None,)
+    
+    CLI.add_argument("--metadataTemplate",nargs='+',type=str,default=[],)
+
+    CLI.add_argument("--copyFrom",nargs="?",type=str,default=None,)
+
+    CLI.add_argument("--copyTag",nargs="?",type=str,default='',)
+
+    CLI.add_argument("--timeShift",nargs="?",type=int,default=None,)
+  
+    CLI.add_argument("--reset",nargs="?",type=int,default=0,)
+
+
+    CLI.add_argument("--Years",nargs='+',type=int,default=[datetime.now().year],)
+
+    CLI.add_argument("--Month",nargs='+',type=int,default=[i+1 for i in range(12)],)
+    
+    CLI.add_argument("--Processes",nargs="?",type=int,default=os.cpu_count(),)
+
     # parse the command line
     args = CLI.parse_args()
 
-    for site in args.siteID:
-        
+    for siteID in args.siteID:
+        ra = read_ALL(siteID,fileType=args.fileType,metadataUpdates=args.metadataUpdates,copyFrom=args.copyFrom,copyTag=args.copyTag,timeShift=args.timeShift)
         for year in args.Years:
 
             for month in args.Month:
-                print(f'Processing: {site} {year}/{month}')
+                print(f'Processing: {siteID} {year}/{month}')
                 t1 = time.time()
-                read_ALL(site,year,month,args.Processes)
+                ra.find_files(year,month,args.Processes)
                 print(f'Completed in: {np.round(time.time()-t1,4)} seconds')
 

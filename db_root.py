@@ -14,17 +14,18 @@ def get_config(fn='_config.yml'):
 
 
 # 1 Search for _config.yml in root of Project Folder
-if os.path.isfile(config_fn):
-    db_root = get_config(config_fn)
+# Not implementing for now
+# if os.path.isfile(config_fn):
+#     db_root = get_config(config_fn)
 
 # 2 Search environment variables for UBC_PC_Setup
 # Repeat 1 & 2, prompt for input as last resort
-else:
-    pth = [v for v in os.environ.values() if 'UBC_PC_Setup' in v]
-    if len(pth)>0:
-        pth = pth[0]+'/'
-        if os.path.isfile(pth+config_fn):
-            config = get_config(pth+config_fn)
+# else:
+pth = [v for v in os.environ.values() if 'UBC_PC_Setup' in v]
+if len(pth)>0:
+    pth = pth[0]+'/'
+    if os.path.isfile(pth+config_fn):
+        config = get_config(pth+config_fn)
 # try:
 #     db_root = config['Database']['root']
 #     db_ini = db_root+'Calculation_Procedures/TraceAnalysis_ini/'
