@@ -31,7 +31,7 @@ class makeRun():
         self.DeBug = testing
         
         self.ini = {}
-        ymls = ['_config.yml']
+        ymls = ['config.yml']
         for y in ymls:
             with open(y) as yml:
                 self.ini.update(yaml.safe_load(yml))

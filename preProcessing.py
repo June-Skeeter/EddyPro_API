@@ -38,7 +38,7 @@ class read_ALL():
         self.ini = {key:dict(self.ini[key]) for key in self.ini.keys()}
         self.ini.update(db.config)
 
-        ymls = ['_config.yml']
+        ymls = ['config.yml']
         for y in ymls:
             with open(y) as yml:
                 self.ini.update(yaml.safe_load(yml))
