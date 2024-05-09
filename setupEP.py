@@ -173,24 +173,7 @@ class makeRun():
                 self.Processes = multiprocessing.active_children()
                 
                 for thread in self.Processes:
-                    cwd = os.getcwd()
-                    bin = cwd+f'/temp/{thread.pid}/bin/'
-                    ini = cwd+f'/temp/{thread.pid}/ini/'
-
-                    shutil.copytree(self.ini['RootDirs']['EddyPro'],bin)
-
-                    batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
-                    with open(batchFile, 'w') as batch:                        
-                        contents = f'cd {bin}'
-                        P = self.priority.lower().replace(' ','')
-                        # contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
-                        contents+=f'\nSTART powershell  ".\\'+self.ini['filenames']['eddypro_rp']+' | tee processing_log.txt"'
-                        contents+='\nping 127.0.0.1 -n 6 > nul'
-                        contents+=f'\nwmic process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{self.priority}"'
-                        contents+='\nping 127.0.0.1 -n 6 > nul'
-                        contents+='\nEXIT'
-                        batch.write(contents)
-                    os.mkdir(ini)
+                    self.make_batch_file(thread.pid)
 
                 pb = progressbar(len(self.runList),'Running EddyPro')
                 for i,_ in enumerate(pool.imap(runEP.Batch,self.runList)):
@@ -200,31 +183,33 @@ class makeRun():
 
                 pool.close()
         elif len(self.runList)>0:
-            cwd = os.getcwd()
-            bin = cwd+f'/temp/{os.getpid()}/bin/'
-            ini = cwd+f'/temp/{os.getpid()}/ini/'
-            if self.DeBug == True:
-                try:
-                    shutil.rmtree(os.getcwd()+f'/temp/{os.getpid()}')
-                except:
-                    pass
-            shutil.copytree(self.ini['Paths']['eddypro_installation'],bin)
-            batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
-            with open(batchFile, 'w') as batch:
-                contents = f'cd {bin}'
-                P = self.priority.lower().replace(' ','')
-                # contents+=f'\nSTART cmd /c '+self.ini['filenames']['eddypro_rp']+' ^> processing_log.txt'
-                contents+=f'\nSTART powershell  ".\\'+self.ini['filenames']['eddypro_rp']+' | tee processing_log.txt"'
-                contents+='\nping 127.0.0.1 -n 6 > nul'
-                contents+=f'\nwmic process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{self.priority}"'
-                contents+='\nping 127.0.0.1 -n 6 > nul'
-                contents+='\nEXIT'
-                batch.write(contents)
-            os.mkdir(ini)
+            self.make_batch_file(os.getpid())
             for r in self.runList:
                 runEP.Batch(r)
             if self.DeBug == False:
                 shutil.rmtree(os.getcwd()+f'/temp/{os.getpid()}')
+
+    def make_batch_file(self,pid):
+        cwd = os.getcwd()
+        bin = cwd+f'/temp/{pid}/bin/'
+        ini = cwd+f'/temp/{pid}/ini/'
+        if self.DeBug == True:
+            try:
+                shutil.rmtree(os.getcwd()+f'/temp/{os.getpid()}')
+            except:
+                pass
+        shutil.copytree(self.ini['RootDirs']['EddyPro'],bin)
+        batchFile=f'{bin}runEddyPro.bat'.replace('/',"\\")
+        with open(batchFile, 'w') as batch:
+            contents = f'cd {bin}'
+            P = self.priority.lower().replace(' ','')
+            contents+=f'\nSTART powershell  ".\\'+self.ini['filenames']['eddypro_rp']+' | tee processing_log.txt"'
+            contents+='\nping 127.0.0.1 -n 6 > nul'
+            contents+=f'\nwmic process where name="{self.ini["filenames"]["eddypro_rp"]}" CALL setpriority "{self.priority}"'
+            contents+='\nping 127.0.0.1 -n 6 > nul'
+            contents+='\nEXIT'
+            batch.write(contents)
+        os.mkdir(ini)
 
     def merge_outputs(self):
                     

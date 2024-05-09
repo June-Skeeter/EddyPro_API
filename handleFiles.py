@@ -21,6 +21,9 @@ import readLiConfigFiles as rLCF
 importlib.reload(rLCF)
 from HelperFunctions import EventLog as eL
 
+# Copy ghg or dat files and shift timestamp in file name if needed
+# useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
+# Called from preProcessing module, defined here to allow copying to be done in parallel
 def copy_files(filename,in_dir,out_dir,fileInfo,year,month):
     if filename.endswith(fileInfo['type']) and fileInfo['tag'] in filename:
         srch = re.search(fileInfo['search'], filename).group(0)
@@ -40,7 +43,8 @@ def copy_files(filename,in_dir,out_dir,fileInfo,year,month):
         return(False)
     
 
-# Pars ghg/dat files
+# Parse ghg or dat files
+# Called from preProcessing module, defined here to allow execution in parallel
 class Parse():
     def __init__(self,ini):
         self.ini = ini
@@ -57,6 +61,7 @@ class Parse():
         biometData = pd.read_csv(self.ini['Paths']['biomet_path']+self.ini['filenames']['biomet_file'])
         self.biometTraces = biometData.columns
         
+        # Module for parsing calibration info directly from newer ghg files
         self.getCal = rLCF.read_LI_Config()
 
     def process_file(self,input,Template_File=True,Testing=False):
