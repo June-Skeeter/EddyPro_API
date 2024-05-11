@@ -22,6 +22,7 @@ from HelperFunctions import sub_path
 from HelperFunctions import progressbar
 importlib.reload(handleFiles)
 
+
 class read_ALL():
     def __init__(self,siteID,reset=0,fileType='ghg',copyFrom=None,copyTag='',metadataTemplate=[],metadataUpdates=None,timeShift=None):
         self.fileType=fileType
@@ -32,53 +33,57 @@ class read_ALL():
         inis = ['Metadata_Instructions.ini','EP_Dynamic_Updates.ini']
 
         ini_file = ['ini_files/'+ini for ini in inis]
-        self.ini = configparser.ConfigParser()
-        self.ini.read(ini_file)
+        self.config = configparser.ConfigParser()
+        self.config.read(ini_file)
 
-        self.ini = {key:dict(self.ini[key]) for key in self.ini.keys()}
-        self.ini.update(db.config)
+        self.config = {key:dict(self.config[key]) for key in self.config.keys()}
+        self.config.update(db.config)
 
-        ymls = ['config.yml']
-        for y in ymls:
-            with open(y) as yml:
-                self.ini.update(yaml.safe_load(yml))
+        for f in ['config.yml','user_path_definitions.yml']:
+            if os.path.isfile(f'config_files/{f}'):
+                with open(f'config_files/{f}') as yml:
+                    self.config.update(yaml.safe_load(yml))
                 
         # File specific operations
-        self.ini[fileType]['tag'] = copyTag
-        self.ini[fileType]['timeShift'] = timeShift
+        self.config[fileType]['tag'] = copyTag
+        self.config[fileType]['timeShift'] = timeShift
         
-        class_dict = self.__dict__
-        class_dict.update(self.ini['RootDirs'])
-        class_dict.update(self.ini['Paths']['Substitutions'])
+        self.config['Paths'] = {}
+        for key,val in self.config['RelativePaths'].items():
+            self.config['Paths'][key] = eval(val)
 
-        time_invariant = {}
-        for key,path in self.ini['Paths'].items():
-            if isinstance(path,str):
-                self.ini['Paths'][key] = sub_path(class_dict,path)
-                time_invariant[key] = self.ini['Paths'][key]
-        self.ini['Paths']['time_invariant'] = time_invariant
+        # class_dict = self.__dict__
+        # class_dict.update(self.config['RootDirs'])
+        # class_dict.update(self.config['Paths']['Substitutions'])
+
+        # time_invariant = {}
+        # for key,path in self.config['Paths'].items():
+        #     if isinstance(path,str):
+        #         self.config['Paths'][key] = sub_path(class_dict,path)
+        #         time_invariant[key] = self.config['Paths'][key]
+        # self.config['Paths']['time_invariant'] = time_invariant
 
         # if metadataUpdates is not None:
-        self.ini['filenames']['metadata_to_overwrite'] = sub_path(self.__dict__,str(metadataUpdates))
+        self.config['filenames']['metadata_to_overwrite'] = sub_path(self.__dict__,str(metadataUpdates))
 
-        if reset == 1 and os.path.isdir(self.ini['Paths']['meta_dir']):
-            proceed = input(f"Warning: You are about to complete a hard reset, deleting all contents of: {self.ini['Paths']['meta_dir']}\nHit enter to proceed, type any other key + enter to escape?")
+        if reset == 1 and os.path.isdir(self.config['Paths']['meta_dir']):
+            proceed = input(f"Warning: You are about to complete a hard reset, deleting all contents of: {self.config['Paths']['meta_dir']}\nHit enter to proceed, type any other key + enter to escape?")
             if proceed != '':
                 sys.exit()
     
-            print(f"Deleting all contents of: {self.ini['Paths']['meta_dir']}")
-            shutil.rmtree(self.ini['Paths']['meta_dir'])
+            print(f"Deleting all contents of: {self.config['Paths']['meta_dir']}")
+            shutil.rmtree(self.config['Paths']['meta_dir'])
             time.sleep(1)
         
-        if not os.path.exists(self.ini['Paths']['meta_dir']):
-            Path(self.ini['Paths']['meta_dir']).mkdir(parents=True, exist_ok=True)
+        if not os.path.exists(self.config['Paths']['meta_dir']):
+            Path(self.config['Paths']['meta_dir']).mkdir(parents=True, exist_ok=True)
             time.sleep(1)
 
         # Copy over any metadata templates
         for md in metadataTemplate:
-            if not os.path.isfile(self.ini['Paths']['meta_dir']+os.path.basename(md)):
+            if not os.path.isfile(self.config['Paths']['meta_dir']+os.path.basename(md)):
                 print('Copying Metadata file:\n',md)
-                shutil.copy2(md,self.ini['Paths']['meta_dir'])
+                shutil.copy2(md,self.config['Paths']['meta_dir'])
         
         time.sleep(1)
         self.Logs = []
@@ -92,26 +97,26 @@ class read_ALL():
         self.year = str(Year)
         self.month = "{:02d}".format(Month)
         
-        for key,path in self.ini['Paths'].items():
+        for key,path in self.config['Paths'].items():
             if isinstance(path,str):
-                self.ini['Paths'][key]=sub_path(self.__dict__,self.ini['Paths']['time_invariant'][key])
+                self.config['Paths'][key]=sub_path(self.__dict__,self.config['Paths']['time_invariant'][key])
 
         # Get every file that is at the end of a directory tree
         all_files = []
         TIMESTAMP = []
         name_pattern = []
         if self.copyFrom is not None:
-            if os.path.isdir(self.ini['Paths']['raw_path']) == False:
-                os.makedirs(self.ini['Paths']['raw_path'])
+            if os.path.isdir(self.config['Paths']['raw_path']) == False:
+                os.makedirs(self.config['Paths']['raw_path'])
             self.copy_files(processes)
-        if os.path.isdir(self.ini['Paths']['raw_path']):
-            for file in os.listdir(self.ini['Paths']['raw_path']):
+        if os.path.isdir(self.config['Paths']['raw_path']):
+            for file in os.listdir(self.config['Paths']['raw_path']):
                 if file.endswith(self.fileType):
                     name = file.rsplit('.',1)[0]
                     all_files.append(file)
-                    timestamp_info = re.search(self.ini[self.fileType]['search'], name).group(0)
-                    TIMESTAMP.append(datetime.strptime(timestamp_info,self.ini[self.fileType]['format']))
-                    name_pattern.append(name.replace(timestamp_info,self.ini[self.fileType]['ep_date_pattern'])+'.'+self.fileType)
+                    timestamp_info = re.search(self.config[self.fileType]['search'], name).group(0)
+                    TIMESTAMP.append(datetime.strptime(timestamp_info,self.config[self.fileType]['format']))
+                    name_pattern.append(name.replace(timestamp_info,self.config[self.fileType]['ep_date_pattern'])+'.'+self.fileType)
             if len(all_files)>0:
                 # Create dataframe of all GHG files
                 df = pd.DataFrame(data={'filename':all_files,'TIMESTAMP':TIMESTAMP,'name_pattern':name_pattern})
@@ -125,16 +130,16 @@ class read_ALL():
                 for i,row in df.loc[((df['Flag']=='Incomplete Record')&(~df['filename'].str.contains('_incomplete')))].iterrows():
                     old_fn = row['filename']
                     new_fn = df.loc[df.index==i,'filename']=old_fn.split('.')[0]+'_incomplete.'+old_fn.split('.')[1]
-                    if os.path.isfile(f"{self.ini['Paths']['raw_path']}/{new_fn}"):
-                        os.remove(f"{self.ini['Paths']['raw_path']}/{new_fn}")
-                    os.rename(f"{self.ini['Paths']['raw_path']}/{old_fn}",f"{self.ini['Paths']['raw_path']}/{new_fn}")
+                    if os.path.isfile(f"{self.config['Paths']['raw_path']}/{new_fn}"):
+                        os.remove(f"{self.config['Paths']['raw_path']}/{new_fn}")
+                    os.rename(f"{self.config['Paths']['raw_path']}/{old_fn}",f"{self.config['Paths']['raw_path']}/{new_fn}")
                     
                 # Resample to get timestamp on consistent half-hourly intervals
                 df = df.resample('30T').first()
 
                 # Append to existing file or write new file
                 try:
-                    self.files = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+                    self.files = pd.read_csv(self.config['Paths']['meta_dir']+self.config['filenames']['file_inventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
                     self.files = pd.concat([self.files,df.loc[df.index.isin(self.files.index)==False]])
                     # Resample to get timestamp on consistent half-hourly intervals
                     self.files = self.files.resample('30T').asfreq()
@@ -143,11 +148,11 @@ class read_ALL():
                 except:
                     # Sort so that oldest files get processed first
                     self.files = df.sort_index()#ascending=False)
-                    self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
+                    self.files.to_csv(self.config['Paths']['meta_dir']+self.config['filenames']['file_inventory'])
         else:
-            print(f"Not a valid directory: {self.ini['Paths']['raw_path']}")
+            print(f"Not a valid directory: {self.config['Paths']['raw_path']}")
     
-        self.Parser = handleFiles.Parse(self.ini)
+        self.Parser = handleFiles.Parse(self.config)
         if hasattr(self, 'files'):
             self.Read(processes,Test)
 
@@ -160,13 +165,13 @@ class read_ALL():
                     with Pool(processes=processes) as pool:
                         max_chunksize=4
                         chunksize=min(int(np.ceil(len(files)/processes)),max_chunksize)
-                        for out in pool.imap(partial(handleFiles.copy_files,in_dir=dir,out_dir=self.ini['Paths']['raw_path'],fileInfo=self.ini[self.fileType],year=self.year,month=self.month),files,chunksize=chunksize):
+                        for out in pool.imap(partial(handleFiles.copy_files,in_dir=dir,out_dir=self.config['Paths']['raw_path'],fileInfo=self.config[self.fileType],year=self.year,month=self.month),files,chunksize=chunksize):
                             pb.step()
                         pool.close()
                         pb.close()
                 else:
                     for filename in files:
-                        handleFiles.copy_files(filename,dir,self.ini['Paths']['raw_path'],fileInfo=self.ini[self.fileType],year=self.year,month=self.month)
+                        handleFiles.copy_files(filename,dir,self.config['Paths']['raw_path'],fileInfo=self.config[self.fileType],year=self.year,month=self.month)
 
 
     def makeEmpty(self,type='object',ixName='TIMESTAMP'):
@@ -178,10 +183,10 @@ class read_ALL():
     def Read(self,processes=os.cpu_count(),Test=0):
         # Read existing data records if they exist, create empty ones if they don't exist
         try:
-            self.dataRecords = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
-            self.dynamic_metadata = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['dynamic_metadata'],parse_dates={'TIMESTAMP':['date','time']},index_col='TIMESTAMP')
-            self.site_setup = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['site_setup'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
-            self.Calibration = pd.read_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
+            self.dataRecords = pd.read_csv(self.config['Paths']['meta_dir']+self.config['filenames']['raw_means'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+            self.dynamic_metadata = pd.read_csv(self.config['Paths']['meta_dir']+self.config['filenames']['dynamic_metadata'],parse_dates={'TIMESTAMP':['date','time']},index_col='TIMESTAMP')
+            self.site_setup = pd.read_csv(self.config['Paths']['meta_dir']+self.config['filenames']['site_setup'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+            self.Calibration = pd.read_csv(self.config['Paths']['meta_dir']+self.config['filenames']['calibration_parameters'])
             print('Pre-existing metadata imported')
         except:
             print('Starting fresh run')
@@ -232,10 +237,10 @@ class read_ALL():
         df = pd.DataFrame(data=out['dataValues'],index=[out['TimeStamp']])
         df.index.name='TIMESTAMP'
         if out['Log']['Failed_to_Parse'] == '':
-            dyn = self.ini['Monitor']['dynamic_metadata'].split(',')
-            stup = self.ini['Monitor']['site_setup'].split(',')
+            dyn = self.config['Monitor']['dynamic_metadata'].split(',')
+            stup = self.config['Monitor']['site_setup'].split(',')
             stup = [x for x in stup if x in df.columns.values]
-            self.ini['Monitor']['site_setup'] = ','.join(stup)
+            self.config['Monitor']['site_setup'] = ','.join(stup)
 
             self.dynamic_metadata = pd.concat([self.dynamic_metadata,df[dyn]])
             self.site_setup = pd.concat([self.site_setup,df[stup]])
@@ -254,36 +259,36 @@ class read_ALL():
     
     def prepareOutputs(self):
         self.GroupCommon()
-        dyn = self.ini['Monitor']['dynamic_metadata'].split(',')
-        static = [d for d in dyn if d in self.ini['Monitor']['fixed_dynamic']]
-        dyn = [d for d in dyn if d not in self.ini['Monitor']['fixed_dynamic']]
+        dyn = self.config['Monitor']['dynamic_metadata'].split(',')
+        static = [d for d in dyn if d in self.config['Monitor']['fixed_dynamic']]
+        dyn = [d for d in dyn if d not in self.config['Monitor']['fixed_dynamic']]
         for s in static:
             if s in self.dynamic_metadata.columns:
                 self.dataRecords[s] = self.dynamic_metadata[s].mean()
                 self.dataRecords[s+'_1SE'] = self.dynamic_metadata[s].std()/(self.dynamic_metadata[s].count()**.5)
-        self.dataRecords.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['raw_means'])
+        self.dataRecords.to_csv(self.config['Paths']['meta_dir']+self.config['filenames']['raw_means'])
         
-        if self.ini['Monitor']['in_biomet_file'] != '':
+        if self.config['Monitor']['in_biomet_file'] != '':
             # Assumes using only one timestamp column in biomet.  EP does support multiple timestamp columns so could implement a more generic solution
-            self.bm = pd.read_csv(self.ini['Paths']['biomet_path']+self.ini['filenames']['biomet_file'],
-                                  parse_dates=[self.ini['biom_timestamp']['name']],
-                                  date_format=self.ini['biom_timestamp']['format'],
-                                  index_col=self.ini['biom_timestamp']['name'],
+            self.bm = pd.read_csv(self.config['Paths']['biomet_path']+self.config['filenames']['biomet_file'],
+                                  parse_dates=[self.config['biom_timestamp']['name']],
+                                  date_format=self.config['biom_timestamp']['format'],
+                                  index_col=self.config['biom_timestamp']['name'],
                                   skiprows=[1])
-            for param in self.ini['Monitor']['in_biomet_file'].split(','):
+            for param in self.config['Monitor']['in_biomet_file'].split(','):
                 if param in self.bm:
                     ow = self.bm.loc[self.bm.index.isin(self.dynamic_metadata.index),param]
                     self.dynamic_metadata.loc[self.dynamic_metadata.index.isin(ow.index),param] = ow
         self.dynamic_metadata['date'] = self.dynamic_metadata.index.strftime('%Y-%m-%d')
         self.dynamic_metadata['time'] = self.dynamic_metadata.index.strftime('%H:%M')
         dyn = ['date','time']+dyn
-        self.dynamic_metadata[dyn].to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['dynamic_metadata'],index=False)
-        self.site_setup.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['site_setup'])
-        self.Calibration.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['calibration_parameters'])
+        self.dynamic_metadata[dyn].to_csv(self.config['Paths']['meta_dir']+self.config['filenames']['dynamic_metadata'],index=False)
+        self.site_setup.to_csv(self.config['Paths']['meta_dir']+self.config['filenames']['site_setup'])
+        self.Calibration.to_csv(self.config['Paths']['meta_dir']+self.config['filenames']['calibration_parameters'])
         self.GroupRuns()
         self.files = self.files.join(self.Logs)
         self.files['filename']=self.files['filename'].fillna('')
-        self.files.to_csv(self.ini['Paths']['meta_dir']+self.ini['filenames']['file_inventory'])
+        self.files.to_csv(self.config['Paths']['meta_dir']+self.config['filenames']['file_inventory'])
 
     def GroupCommon(self):
         self.site_setup = self.site_setup[~self.site_setup.index.duplicated()].copy()
@@ -291,7 +296,7 @@ class read_ALL():
         self.site_setup = self.site_setup.fillna(0)
         # If something crashes here, its likely a result of incomplete parsing.
         # Implement fix if crashes occur
-        self.site_setup['temp_ID'] = self.site_setup.groupby(self.ini['Monitor']['site_setup'].split(','))[['temp_ID']].transform(lambda x: x.min())
+        self.site_setup['temp_ID'] = self.site_setup.groupby(self.config['Monitor']['site_setup'].split(','))[['temp_ID']].transform(lambda x: x.min())
         self.site_setup['setup_ID']=np.nan
         for i,val in enumerate(self.site_setup['temp_ID'].unique()):
             self.site_setup.loc[self.site_setup['temp_ID']==val,'setup_ID'] = i
@@ -311,10 +316,10 @@ class read_ALL():
                 ),'MetaDataFile']=row['MetaDataFile']
             
         for rem in toRemove:
-            if os.path.isfile(f"{self.ini['Paths']['meta_dir']}{rem}"):
-                os.remove(f"{self.ini['Paths']['meta_dir']}{rem}")
-            if os.path.isfile(f"{self.ini['Paths']['meta_dir']}{rem.replace('.metadata','.eddypro')}"):
-                os.remove(f"{self.ini['Paths']['meta_dir']}{rem.replace('.metadata','.eddypro')}")
+            if os.path.isfile(f"{self.config['Paths']['meta_dir']}{rem}"):
+                os.remove(f"{self.config['Paths']['meta_dir']}{rem}")
+            if os.path.isfile(f"{self.config['Paths']['meta_dir']}{rem.replace('.metadata','.eddypro')}"):
+                os.remove(f"{self.config['Paths']['meta_dir']}{rem.replace('.metadata','.eddypro')}")
         
 # If called from command line ...
 if __name__ == '__main__':
