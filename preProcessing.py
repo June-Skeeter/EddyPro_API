@@ -28,11 +28,12 @@ dname = os.path.dirname(abspath)
 
 class preProcessing():
     os.chdir(dname)
-    def __init__(self,siteID,fileType='ghg',processes=os.cpu_count(),Testing=0):
+    def __init__(self,siteID,fileType='ghg',metaDataTemplate=None,processes=os.cpu_count(),Testing=0):
         self.siteID = siteID
         self.fileType = fileType
         self.Testing = Testing
         self.processes = processes
+        
 
         # Concatenate and read the ini files
         # LICOR uses .ini format to define .metadata and .eddypro files
@@ -64,8 +65,10 @@ class preProcessing():
             self.fileInventory = pd.read_csv(self.config['fileInventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
         else:
             os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
-
-
+            
+        # Initiate parser class
+        # Defined externally to facilitate parallel processing
+        self.Parser = handleFiles.Parser(self.config,metaDataTemplate)
 
     def searchRawDir(self,copyFrom=None,searchTag='',timeShift=None):
         # Build the file inventory of the "raw" directory
@@ -140,31 +143,31 @@ class preProcessing():
             os.rename(f"{dpth}/{old_fn}",f"{dpth}/{new_fn}")
     
     def readFiles(self):
+        # Call file handler to parse files in parallel (default) or sequentially for troubleshooting
         pathList=(self.config['Paths']['raw']+self.fileInventory.index.strftime('%Y/%m/')+self.fileInventory['filename'])
-        
+        self.data = pd.DataFrame()
+        self.metaData = pd.DataFrame()
+        md_out = []
         if (__name__ == 'preProcessing' or __name__ == '__main__') and self.processes>1:
             # run routine in parallel
             pb = progressbar(len(pathList),'')
             with Pool(processes=self.processes) as pool:
                 max_chunksize=4
                 chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
-                for out in pool.imap(partial(handleFiles.readFile),pathList.items(),chunksize=chunksize):
+                for out in pool.imap(partial(self.Parser.readFile),pathList.items(),chunksize=chunksize):
                     pb.step()
-                    print(out)
+                    self.data = pd.concat([self.data,out[0]])
+                    self.metaData = pd.concat([self.metaData,out[1]])
                 pool.close()
                 pb.close()
         else:
             # run routine sequentially
             for i,file in pathList.items():
                 # if i < self.Testing or self.Testing == 0:
-                out = handleFiles.readFile((i,file))
-                print(out)
-                    # out = handleFiles.copy_and_check_files(filename,dir,self.config['Paths']['raw'],fileInfo=self.config[self.fileType])
-                    # douot.append(out)
+                out = self.Parser.readFile((i,file))
+                self.data = pd.concat([self.data,out[0]])
+                self.metaData = pd.concat([self.metaData,out[1]])
 
-        # for i,row in self.fileInventory.iterrows():
-        #     dpth = f"{self.config['Paths']['raw']}/{i.year}/{str(i.month).zfill(2)}/"
-        #     print(dpth,row['filename'])
 
 class read_ALL():
     def __init__(self,siteID,reset=0,fileType='ghg',copyFrom=None,searchTag='',metadataTemplate=[],metadataUpdates=None,timeShift=None):

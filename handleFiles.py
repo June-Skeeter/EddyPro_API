@@ -3,6 +3,7 @@
 
 import os
 import re
+import csv
 import sys
 from pathlib import Path
 import zipfile
@@ -48,302 +49,85 @@ def copy_and_check_files(filename,in_dir,out_dir,fileInfo,byYear=True,byMonth=Tr
     else: 
         return([None,None,None])
     
-def readFile(file):
-    timestamp=file[0]
-    filepath=file[1]
-    if filepath.endswith('.ghg'):
-        out = extractGHG(filepath)
-    else:
-        out = False
-
-def extractGHG(filepath):
-    return(True)
-    
-# class Parse():
-#     def __init__(self,):
-#         self.ini = ini
-    
+class Parser():
+    def __init__(self,config,metaDataTemplate=None):
+        self.config = config
+        self.agg = [key for key, value in self.config['aggregation'].items() if value is True]
+        if metaDataTemplate is not None:
+            self.metaDataTemplate,self.fileDescription = self.readMetaData(open(metaDataTemplate))
+            self.fileDescription.update(self.config['dat'])
 
 
-# Parse ghg or dat files
-# Called from preProcessing module, defined here to allow execution in parallel
-class Parse_old():
-    def __init__(self,ini):
-        self.ini = ini
-        self.max_missing = float(eval(self.ini['RawProcess_Settings']['max_lack']))*.01
-        self.Vars = configparser.ConfigParser()
-        self.Vars.read_file(open(self.ini['templates']['variableList']))
-
-        if os.path.isfile(self.ini['filenames']['metadata_to_overwrite']):
-            self.UpdateMetadata = pd.read_csv(self.ini['filenames']['metadata_to_overwrite'],parse_dates={'Start':['TIMESTAMP_Start'],'End':['TIMESTAMP_End']})
-            self.UpdateMetadata['End']=self.UpdateMetadata['End'].fillna(pd.to_datetime(datetime.datetime.now()).ceil('H'))
-            self.UpdateMetadata.reset_index(inplace=True)
-            self.UpdateMetadata.set_index(['Start','End','index'],inplace=True)
-
-        biometData = pd.read_csv(self.ini['Paths']['biomet_path']+self.ini['filenames']['biomet_file'])
-        self.biometTraces = biometData.columns
-        
-        # Module for parsing calibration info directly from newer ghg files
-        self.getCal = rLCF.read_LI_Config()
-
-    def process_file(self,input,Template_File=True,Testing=False):
-        self.dataValues = {}
-        self.EV = eL(classes=['Flag','Update','Failed_to_Parse','Cal_info'])
-        self.Template_File_Available = Template_File
-        self.filename = input[0]
-        self.TimeStamp = input[1]
-        self.fullFile = self.ini['Paths']['raw_path']+'/'+self.filename
-        self.filename, self.file_type = self.filename.rsplit('.',1)
-        try:
-            if self.file_type == 'ghg':
-                with zipfile.ZipFile(self.fullFile, 'r') as ghgZip:
-                    self.whichFiles(ghgZip.namelist())
-                    self.Template_File_Available = self.Parse_Metadata(TextIOWrapper(ghgZip.open(self.ghgFiles['metadata']), 'utf-8'),self.Template_File_Available)
-                    if ~hasattr(self, 'data_columns'):
-                        self.readHeader(ghgZip.open(self.ghgFiles['data']))
-                    self.read_dat(ghgZip.open(self.ghgFiles['data']))
-                    # Read the calibration config data (only do one per day for expedience)
-                    if self.ini['Calibration_Info']['readCal'] == True and (self.TimeStamp.strftime('%H:%M') == '00:00' or Testing == True):
-                        if len(self.ghgFiles['system_config']['xmlFiles'])>0:
-                            for i, f in enumerate(self.ghgFiles['system_config']['xmlFiles']):
-                                self.getCal.readXML(ET.parse(ghgZip.open(f)),i,self.TimeStamp)
-                        elif self.ghgFiles['system_config']['co2app'] != '':
-                            # Read the co2app file (and header info) - only useful if there is a 7200
-                            self.getCal.readConfig(ghgZip.open(self.ghgFiles['system_config']['co2app']).read().decode("utf-8"),self.TimeStamp)
-                        else:
-                            self.EV.updateLog('Calibration','Missing','Cal_info')
-
-            else:
-                templateFiles = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*.metadata")]
-                templateFiles.sort()
-                self.Parse_Metadata(open(templateFiles[-1]),self.Template_File_Available)
-                self.readHeader(self.fullFile)
-                self.read_dat(self.fullFile)
-                self.Metadata_Filename = os.path.basename(templateFiles[-1])
-            if Testing == True:
-                print({'TimeStamp':self.TimeStamp,
-                    'MetadataFile':self.Metadata_Filename},
-                    'Log',self.EV.Log)
-        except:
-            e = (traceback.format_exc())            
-            if Testing == True:
-                print(e)
-            self.EV.updateLog(f"Traceback ",e,'Failed_to_Parse')
-            self.Metadata_Filename = ''
-            pass
-        if self.EV.Log['Flag'] == '':
-            self.EV.Log['Flag'] = 'No Issues'
-        return({'TimeStamp':self.TimeStamp,
-                'dataValues':self.dataValues.copy(),
-                'MetadataFile':self.Metadata_Filename,
-                'Log':self.EV.Log,
-                'calData':self.getCal.calData.copy(),
-                'Updated':self.Template_File_Available})
-
-    def readHeader(self,file):
-        self.Variable_Names = {}
-        self.Variable_Positions = {}
-        if self.file_type == 'ghg':
-            self.data_columns = np.array(file.readlines()[int(self.Metadata['FileDescription']['header_rows'])-1].decode('utf-8').split(self.delimiter))
-        elif self.file_type == 'dat':
-            with open(file,'r') as f:
-                head = f.readlines()
-                self.data_columns = np.array(head[int(self.Metadata['FileDescription']['header_rows'])-3].replace('"', '').replace('\n','').split(self.delimiter))
-                self.data_units = np.array(head[int(self.Metadata['FileDescription']['header_rows'])-2].replace('"', '').replace('\n','').split(self.delimiter))
-        # Assumes site is running one 7200 or 7550, not both or multiples.  May need to implement more nuanced process if site has multiple co2 analyzers
-
-        if '72' in self.Metadata['Instruments']['instr_2_model']:
-            self.Vars['Project']['col_diag_75']=''
-        elif '75' in self.Metadata['Instruments']['instr_2_model']:
-            self.Vars['Project']['col_diag_75']=''
-        for to_process in ['Sonic','Project','Auxillary']:
-            for key,val in self.Vars[to_process].items():
-                for rec in val.split(','):
-                    if rec in self.data_columns:
-                        col_num = np.where(self.data_columns==rec)[0]
-                        self.data_columns[col_num] = key
-                        self.Variable_Positions[key] = col_num[0]
-                        self.Variable_Names[key] = rec
-                        break
-
-    def read_dat(self,file):
-        Data = pd.read_csv(file,delimiter=self.delimiter,skiprows=int(self.Metadata['FileDescription']['header_rows']),header=None)
-        Data.columns = self.data_columns
-        self.dataValues['n_samples'] = Data.shape[0]
-        for key,val in self.Variable_Names.items():
-            if key in self.data_columns:
-                Data[key]=pd.to_numeric(Data[key],errors='coerce')
-                if key in self.Vars['Essentials']['req'].split(',') and Data[key].isna().sum()>=self.max_missing*self.dataValues['n_samples']:
-                    self.EV.updateLog(f"Missing > {self.ini['RawProcess_Settings']['max_lack']} % ",f'{key}','Flag')
-                if 'diag' in key:
-                    self.getStats(Data,key,'max')
-                else:
-                    self.getStats(Data,key)
-                if key == 'sos':
-                    #  Sonic Virtual Temp, eq 9 pg C-2: https://s.campbellsci.com/documents/ca/manuals/csat3_man.pdf
-                    Data['t_sonic'] = (Data[key]**2/(1.4*287.04))
-                    self.getStats(Data,'t_sonic')
-        for key,val in self.Vars['Custom'].items():
-            self.dataValues[key]=eval(val)
-        if self.Template_File_Available is False:
-            self.Write_EP_Template(Data.columns)              
-              
-    def Parse_Metadata(self,meta_file,MetadataTemplate_File):  
-        # Look for changes in the metadata file and return new metadata template file for each update
-        # Correct metadata where necessary (e.g., undocumented orientation change)
-        # See ini_files/Metadata_Instructions.ini for metadata varialbes bing 
-        
-        self.Metadata = configparser.ConfigParser()
-        self.Metadata.read_file(meta_file)
-        
-        if hasattr(self, 'UpdateMetadata'):
-            Start = self.UpdateMetadata.index.get_level_values('Start')
-            End = self.UpdateMetadata.index.get_level_values('End')
-            To_update = self.UpdateMetadata.loc[((Start<=self.TimeStamp)&(End>=self.TimeStamp))]
-            for _,row in To_update.iterrows():
-                columns = row.dropna().index
-                values = row.dropna()
-                for col,cel in zip(columns,values):
-                    self.Metadata[col.split(' ')[0]][col.split(' ')[1]]=str(cel)
-        
-        templateList = [path.__str__() for path in Path(self.ini['Paths']['meta_dir']).rglob(f"*.metadata")]
-        templateList.sort()
-        templateFiles=[templateList[i] for i in range(len(templateList)) if os.path.basename(templateList[i]) <= os.path.basename(meta_file.name)]
-
-        if len(templateFiles)<1:
-            MetadataTemplate_File = False
-            
-        if MetadataTemplate_File is True:
-            self.MetadataTemplate = configparser.ConfigParser()
-            self.MetadataTemplate.read_file(open(templateFiles[-1]))
-            MetadataTemplate_File=self.check_values(MetadataTemplate_File)
-        
-           
-        if MetadataTemplate_File is False:
-            self.MetadataTemplate = configparser.ConfigParser()
-            self.MetadataTemplate.read_dict(self.Metadata)
-            filename = f"{self.filename}.metadata"
-            self.Metadata_Filename = filename
-            MetadataTemplate_File=self.check_values(MetadataTemplate_File)
-                    
-            with open(f"{self.ini['Paths']['meta_dir']}{filename}", 'w') as template:
-                template.write(';GHG_METADATA\n')
-                self.MetadataTemplate.write(template,space_around_delimiters=False)
+    def readFile(self,file):
+        timestamp=file[0]
+        filepath=file[1]
+        if filepath.endswith('.ghg'):
+            d_agg,metaData = self.extractGHG(filepath,timestamp)
         else:
-            self.Metadata_Filename = os.path.basename(templateFiles[-1])
-        self.delimiter = self.ini['delimiter_key'][self.Metadata['FileDescription']['separator']].encode('ascii','ignore').decode('unicode_escape')
+            d_agg = self.readData(filepath,self.fileDescription,timestamp)
+            metaData = self.metaDataTemplate.copy()
+        del metaData['DEFAULT']
+        mdDF = {(k1,k2):val for k1 in metaData.keys() for k2,val in metaData[k1].items()}
+        mdDF = pd.DataFrame(mdDF,index=[timestamp])
+        mdDF.index.name = 'TIMESTAMP'
+        return(d_agg,mdDF)
+
+    def extractGHG(self,filepath,timestamp):
+        base = os.path.basename(filepath).rstrip('.ghg')
+        ghgInventory = {}
+        with zipfile.ZipFile(filepath, 'r') as ghgZip:
+            subFiles=ghgZip.namelist()
+            # Get all possible contents of ghg file
+            # For now only concerned with .data and .metadata
+            # Will expand to biomet and config/calibration files later
+            for f in subFiles:
+                ghgInventory[f.replace(base,'')]=f
+            metaData,fileDescription = self.readMetaData(TextIOWrapper(ghgZip.open(ghgInventory['.metadata']), 'utf-8'))
+            fileDescription.update(self.config['ghg'])
+            if hasattr(fileDescription, 'skip_rows') == False:
+                fileDescription['skip_rows'] = int(fileDescription['header_rows'])-1
+                fileDescription['header_rows'] = [0]
+
+            d_agg = self.readData(ghgZip.open(ghgInventory['.data']),fileDescription,timestamp)
+        return(d_agg,metaData)
+
+    def readMetaData(self,metaDataFile):
+        # Parse the .metadata file included in the .ghg file
+        # Or parse a userdefined template
+        metaData = configparser.ConfigParser()
+        metaData.read_file(metaDataFile)
+        metaData = {key:dict(metaData[key]) for key in metaData.keys()}
+
+        # Isolate and parse file description for reading data files
+        fileDescription = metaData['FileDescription'].copy()
+        fileDescription['delimiter'] = self.config['delimiters'][fileDescription['separator']].encode('ascii','ignore').decode('unicode_escape')
         
-        return(MetadataTemplate_File)
+        return(metaData,fileDescription)
     
-    def check_values(self,MetadataTemplate_File):
-        for section,values in self.MetadataTemplate.items():
-            for key in values.keys():
-                if key not in self.Metadata[section]:
-                    self.EV.updateLog('Missing in metadata file',f'{section}:{key}','Flag')
-                    MetadataTemplate_File = False
-                elif key in self.ini['Monitor']['site_setup'].split(','):
-                    try:
-                        self.dataValues[key] = float(self.Metadata[section][key])
-                    except:
-                        self.dataValues[key] = np.nan
-                    # Overwrite any values from the correction
-                    if self.Metadata[section][key]!=self.MetadataTemplate[section][key]:
-                        self.EV.updateLog(f'Setup {key}',self.Metadata[section][key],'Update')
-                        MetadataTemplate_File = False
-                elif key in self.ini['Monitor']['dynamic_metadata'].split(','):
-                    self.dataValues[key] = float(self.Metadata[section][key])
-                elif key in self.ini['Calculate'].keys():
-                    self.dataValues[key] = eval(self.ini['Calculate'][key])
-                elif key not in self.ini['Overwrite'].keys():
-                    if self.Metadata[section][key]!=self.MetadataTemplate[section][key]:
-                        self.EV.updateLog(f'Other {key}',self.Metadata[section][key],'Update')
-                        MetadataTemplate_File = False
-        return(MetadataTemplate_File)
+    def readData(self,dataFile,fileDescription,timestamp):
+        data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'])
+        if fileDescription['data_label'] != 'Not set':
+            # .ghg data files contain a "DATA" label if first column which isn't needed
+            data = data.drop(data.columns[0],axis=1)
 
-    def Write_EP_Template(self,cols):
-        self.EddyProTemplate = configparser.ConfigParser()
-        for v in ['Project','RawProcess_BiometMeasurements','RawProcess_WindDirectionFilter']:
-            self.EddyProTemplate.add_section(v)
-        self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_apply']='1'
+        # Parse units from metadata if not included in headers
+        if len(fileDescription['header_rows']) == 1:
+            unit_list = [value for key,value in fileDescription.items() if 'unit_in' in key]
+            data.columns = [data.columns,unit_list]
+        data = data._get_numeric_data()
+        d_agg = data.agg(self.agg)
+        d_agg['Timestamp'] = timestamp
+        d_agg.set_index('Timestamp', append=True, inplace=True)
+        d_agg = d_agg.reorder_levels(['Timestamp',None]).unstack()
+        # print(d_agg)
+        # d_agg = d_agg.to_dict()#orient='tight')
+        # print(d_agg)
+        return(d_agg)
+
         
-        bearing = float(self.Metadata['Instruments']['instr_1_north_offset'])
-        width = float(self.ini['Wind_Filter']['width'])
-        mn_mx = [bearing+180-width,bearing+180+width]
-        if mn_mx[0] <= 360 and mn_mx[1] <= 360:
-            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_start']=str(mn_mx[0])
-            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_end']=str(mn_mx[1])
-        elif mn_mx[0] > 360 and mn_mx[1] > 360:
-            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_start']=str(mn_mx[0]-360)
-            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_end']=str(mn_mx[1]-360)
-        else:
-            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_start']=str(mn_mx[0])
-            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_1_end']=str(360)
-            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_2_start']=str(0)
-            self.EddyProTemplate['RawProcess_WindDirectionFilter']['wdf_sect_2_end']=str(mn_mx[1]-360)
-
-        if self.file_type=='ghg':
-            self.EddyProTemplate['Project']['file_type']='0'
-        else:
-            self.EddyProTemplate['Project']['file_type']='1'
-        for key,value in self.Vars['Project'].items():
-            # for var in value.split(','):
-            col_num = np.where(cols==key)[0]
-            if len(col_num) == 0:
-                channel = 0
-            elif len(col_num)>1:
-                # haven't encountered yet - just a catch to crash the program in case it happens
-                warning = f'Warning! Duplicate Channel {key} in Column Headers'
-                sys.exit(warning)
-            else:
-                channel = int(col_num[0])
-                if self.file_type != 'ghg':
-                    channel += 1
-                # break
-            self.EddyProTemplate['Project'][key] = str(channel)
-
-        for key,value in self.Vars['RawProcess_BiometMeasurements'].items():
-            match = [i for i in range(len(self.biometTraces)) if self.biometTraces[i] == value]
-            if len(match)==1:
-                bm_ix = match[0]+1
-                self.EddyProTemplate['RawProcess_BiometMeasurements'][key] = str(bm_ix)
-
-
-        with open(f"{self.ini['Paths']['meta_dir']}{self.filename}.eddypro", 'w') as eddypro:
-            eddypro.write(';EDDYPRO_PROCESSING\n')
-            self.EddyProTemplate.write(eddypro,space_around_delimiters=False)
-
-
-    def whichFiles(self,files):
-        # Get inventory of files in the zipped .ghg collection
-        # Ignoring biomet data, can expand to include later if needed - likely not necessary
-        self.ghgFiles = {'data':'',
-                        'metadata':'',
-                        'status':'',
-                        'system_config':{
-                            'co2app':'',
-                            'xmlFiles':[]
-                        }}
-        for f in files:
-            if 'biomet' in f:
-                pass
-            elif '.metadata' in f:
-                self.ghgFiles['metadata']=f
-            elif '.data' in f:
-                self.ghgFiles['data']=f
-            elif '.status' in f:
-                self.ghgFiles['status']=f
-            elif 'system_config' in f:
-                if 'co2app' in f:
-                    self.ghgFiles['system_config']['co2app']=f
-                elif '.xml' in f and 'factory' not in f:
-                    self.ghgFiles['system_config']['xmlFiles'].append(f)
-
-    def getStats(self,tbl,rec,stat='mean'):
-        try:
-            if stat == 'mean':
-                self.dataValues[rec] = tbl[rec].astype('float').mean()
-            elif stat == 'max':
-                self.dataValues[rec] = tbl[rec].astype('float').max()
-        except:
-            self.EV.updateLog('Missing Data Value',rec,'Flag')
-            pass
+# def get_delimiter(file_path, bytes = 4096):
+#     # Autodetect file delimiter
+#     sniffer = csv.Sniffer()
+#     data = open(file_path, "r").read(bytes)
+#     delimiter = sniffer.sniff(data).delimiter
+#     return (delimiter)
