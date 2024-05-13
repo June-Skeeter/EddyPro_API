@@ -24,24 +24,40 @@ from HelperFunctions import EventLog as eL
 # Copy ghg or dat files and shift timestamp in file name if needed
 # useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
 # Called from preProcessing module, defined here to allow copying to be done in parallel
-def copy_files(filename,in_dir,out_dir,fileInfo,year,month):
-    if filename.endswith(fileInfo['type']) and fileInfo['tag'] in filename:
-        srch = re.search(fileInfo['search'], filename).group(0)
+def copy_and_check_files(filename,in_dir,out_dir,fileInfo,byYear=True,byMonth=True):
+    if filename.endswith(fileInfo['extension']) and fileInfo['searchTag'] in filename:
+        srch = re.search(fileInfo['search'], filename.rsplit('.',1)[0]).group(0)
         if srch is not None:
+            name_pattern = filename.replace(srch,fileInfo['ep_date_pattern'])
             TIMESTAMP =  datetime.datetime.strptime(srch,fileInfo['format'])
             if fileInfo['timeShift'] is not None:
                 TIMESTAMP = TIMESTAMP+datetime.timedelta(minutes=fileInfo['timeShift'])
-                rep = datetime.datetime.strftime(TIMESTAMP,fileInfo['format'])
-                outName = filename.replace(srch,rep)
+                timeString = datetime.datetime.strftime(TIMESTAMP,fileInfo['format'])
+                outName = filename.replace(srch,timeString)
             else:
                 outName=filename
-            if str(TIMESTAMP.year) == year and str(TIMESTAMP.month).zfill(2) == month and os.path.isfile(f'{out_dir}/{outName}')==False:
-                shutil.copy(f"{in_dir}/{filename}",f"{out_dir}/{outName}")
-                return(True)
-        else: return(False)
+            if byYear==True:
+                out_dir = f'{out_dir}/{str(TIMESTAMP.year)}/'
+                if byMonth==True:
+                    out_dir = f'{out_dir}{str(TIMESTAMP.month).zfill(2)}/'
+            if os.path.isfile(f'{out_dir}/{outName}')==False:
+                os.makedirs(out_dir, exist_ok=True)
+                shutil.copy2(f"{in_dir}/{filename}",f"{out_dir}/{outName}")
+            return([TIMESTAMP,filename,name_pattern])
+        else: return([None,None,None])
     else: 
-        return(False)
+        return([None,None,None])
     
+# def check_file(filename=None,fileInfo=None):
+#     if filename == None or fileInfo == None:
+#         return(None,None,None)
+#     if filename.endswith(fileInfo['extension']) and fileInfo['tag'] in filename:
+#         filename = filename.rsplit('.',1)[0]
+#         # all_files.append(file)
+#         timestamp_info = re.search(fileInfo['search'], filename).group(0)
+#         timestamp_info = datetime.strptime(timestamp_info,fileInfo['format'])
+#         name_pattern = filename.replace(timestamp_info,fileInfo['ep_date_pattern'])+'.'+fileInfo['extension']
+#         return(timestamp_info,filename,name_pattern)
 
 # Parse ghg or dat files
 # Called from preProcessing module, defined here to allow execution in parallel

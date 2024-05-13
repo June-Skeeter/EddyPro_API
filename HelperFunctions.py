@@ -2,6 +2,18 @@ import sys
 import numpy as np
 import pandas as pd
 
+def instrumentSeparation(northOffset,u,v):
+    # for CSAT3
+    # northOffset is degrees from North
+    # u is distance along main axis of sonic (positive=behind)
+    # v is distance perpendicular to main axis (positive = right side as viewed from front)
+
+    # Convert to "math wind direction"
+    mwd = 270-northOffset
+    rad = mwd*np.pi/180
+    x = np.sin(rad)*u+np.sin(rad)*v
+    y = np.cos(rad)*u+np.cos(rad)*v
+    return(x,y)
 
 # substitute keys in a path with corresponding path_strings from a class object 
 # remove from the path if it doesn't exist

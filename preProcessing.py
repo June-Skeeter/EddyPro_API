@@ -13,7 +13,7 @@ import importlib
 import numpy as np
 import pandas as pd
 import configparser
-import db_root as db
+import time
 from pathlib import Path
 from datetime import datetime
 from functools import partial
@@ -22,10 +22,113 @@ from HelperFunctions import sub_path
 from HelperFunctions import progressbar
 importlib.reload(handleFiles)
 
+# Directory of current script
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+
+
+
+class preProcessing():
+    os.chdir(dname)
+    def __init__(self,siteID,fileType='ghg',processes=os.cpu_count(),Testing=0):
+        self.siteID = siteID
+        self.fileType = fileType
+        self.Testing = Testing
+        self.processes = processes
+        # Read configurations
+        with open('config_files/config.yml') as yml:
+            self.config = yaml.safe_load(yml)
+            self.config['siteID'] = siteID
+            if os.path.isfile('config_files/user_path_definitions.yml'):
+                with open('config_files/user_path_definitions.yml') as yml:
+                    self.config.update(yaml.safe_load(yml))
+            else:
+                sys.exit(f"Missing {'config_files/user_path_definitions.yml'}")
+        self.config['Paths'] = {}
+        for key,val in self.config['RelativePaths'].items():
+            self.config['Paths'][key] = eval(val)
+
+        self.config['fileInventory']=self.config['Paths']['meta_dir']+self.config['filenames']['file_inventory']
+        try:
+            self.fileInventory = pd.read_csv(self.config['fileInventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
+        except:
+            pass
+
+    def searchRawDir(self,copyFrom=None,searchTag='',timeShift=None):
+        # Build the file inventory of the "raw" directory
+        # Copy new files to raw if needed with option shift the timestamp 
+        # e.g., copy data and rename using timestamp at end of interval instead of start
+        search_dirs = [self.config['Paths']['raw']]
+        if copyFrom is not None:
+            search_dirs.append(copyFrom)
+        T1 = time.time()
+        self.config[self.fileType]['searchTag'] = searchTag
+        self.config[self.fileType]['timeShift'] = timeShift
+        # Walk the search directories
+        for search in search_dirs:
+            for dir, _, files in os.walk(search):
+                if len(files)>0:
+                    print(f'Searching {dir}')
+                    douot = []
+                    if (__name__ == 'preProcessing' or __name__ == '__main__') and self.processes>1:
+                        # run routine in parallel
+                        pb = progressbar(len(files),'')
+                        with Pool(processes=self.processes) as pool:
+                            max_chunksize=4
+                            chunksize=min(int(np.ceil(len(files)/self.processes)),max_chunksize)
+                            for out in pool.imap(partial(handleFiles.copy_and_check_files,in_dir=dir,out_dir=self.config['Paths']['raw'],fileInfo=self.config[self.fileType]),files,chunksize=chunksize):
+                                pb.step()
+                                douot.append(out)
+                            pool.close()
+                            pb.close()
+                    else:
+                        # run routine sequentially
+                        for i,filename in enumerate(files):
+                            if i < self.Testing or self.Testing == 0:
+                                out = handleFiles.copy_and_check_files(filename,dir,self.config['Paths']['raw'],fileInfo=self.config[self.fileType])
+                                douot.append(out)
+                    # Dump results to inventory
+                    df = pd.DataFrame(columns=['TIMESTAMP','filename','name_pattern'],data=douot)
+                    # Add empty columns for auxillary information
+                    df[['Flag','MetaDataFile','Update']]=''
+                    df['setup_ID']=np.nan
+                    df['TIMESTAMP'] = pd.DatetimeIndex(df['TIMESTAMP'])
+                    df = df.set_index('TIMESTAMP')
+                    # drop rows where all data are missing
+                    df = df.loc[df['filename'].isnull()==False]
+                    # Merge with existing inventory
+                    if hasattr(self,'fileList'):      
+                        self.fileInventory = pd.concat([self.fileInventory,df])
+                    else:
+                        self.fileInventory = df
+        # Incomplete files should be excluded from inventory
+        self.fullFilesOnly()
+        # Resample to get timestamp on consistent half-hourly intervals
+        self.fileInventory = self.fileInventory.resample('30T').first()
+        # Sort so that oldest files get processed first
+        self.fileInventory = self.fileInventory.sort_index()#ascending=False)
+        # Save inventory
+        self.fileInventory.to_csv(self.config['fileInventory'])
+        print('Files Copying Complete, time elapsed: ',time.time()-T1)
+
+    def fullFilesOnly(self):
+        # Flag timestamps with incomplete records
+        self.fileInventory.loc[
+            (((self.fileInventory.index.minute!=30)&(self.fileInventory.index.minute!=0))|
+            (self.fileInventory.index.second!=0)),'Flag'] = 'Incomplete Record'
+        # Loop through incomplete records and flag/rename
+        for i,row in self.fileInventory.loc[((self.fileInventory['Flag']=='Incomplete Record')
+                                &(~self.fileInventory['filename'].str.contains('_incomplete')))].iterrows():
+            old_fn = row['filename']
+            new_fn = self.fileInventory.loc[self.fileInventory.index==i,'filename']=old_fn.split('.')[0]+'_incomplete.'+old_fn.split('.')[1]
+            if os.path.isfile(f"{self.config['Paths']['raw']}/{new_fn}"):
+                os.remove(f"{self.config['Paths']['raw']}/{new_fn}")
+            os.rename(f"{self.config['Paths']['raw']}/{old_fn}",f"{self.config['Paths']['raw']}/{new_fn}")
+        
 
 class read_ALL():
-    def __init__(self,siteID,reset=0,fileType='ghg',copyFrom=None,copyTag='',metadataTemplate=[],metadataUpdates=None,timeShift=None):
-        self.fileType=fileType
+    def __init__(self,siteID,reset=0,fileType='ghg',copyFrom=None,searchTag='',metadataTemplate=[],metadataUpdates=None,timeShift=None):
+        self.fileType = fileType
         self.siteID = siteID
         self.copyFrom = copyFrom
 
@@ -45,7 +148,7 @@ class read_ALL():
                     self.config.update(yaml.safe_load(yml))
                 
         # File specific operations
-        self.config[fileType]['tag'] = copyTag
+        self.config[fileType]['tag'] = searchTag
         self.config[fileType]['timeShift'] = timeShift
         
         self.config['Paths'] = {}
@@ -106,11 +209,11 @@ class read_ALL():
         TIMESTAMP = []
         name_pattern = []
         if self.copyFrom is not None:
-            if os.path.isdir(self.config['Paths']['raw_path']) == False:
-                os.makedirs(self.config['Paths']['raw_path'])
+            if os.path.isdir(self.config['Paths']['raw']) == False:
+                os.makedirs(self.config['Paths']['raw'])
             self.copy_files(processes)
-        if os.path.isdir(self.config['Paths']['raw_path']):
-            for file in os.listdir(self.config['Paths']['raw_path']):
+        if os.path.isdir(self.config['Paths']['raw']):
+            for file in os.listdir(self.config['Paths']['raw']):
                 if file.endswith(self.fileType):
                     name = file.rsplit('.',1)[0]
                     all_files.append(file)
@@ -130,9 +233,9 @@ class read_ALL():
                 for i,row in df.loc[((df['Flag']=='Incomplete Record')&(~df['filename'].str.contains('_incomplete')))].iterrows():
                     old_fn = row['filename']
                     new_fn = df.loc[df.index==i,'filename']=old_fn.split('.')[0]+'_incomplete.'+old_fn.split('.')[1]
-                    if os.path.isfile(f"{self.config['Paths']['raw_path']}/{new_fn}"):
-                        os.remove(f"{self.config['Paths']['raw_path']}/{new_fn}")
-                    os.rename(f"{self.config['Paths']['raw_path']}/{old_fn}",f"{self.config['Paths']['raw_path']}/{new_fn}")
+                    if os.path.isfile(f"{self.config['Paths']['raw']}/{new_fn}"):
+                        os.remove(f"{self.config['Paths']['raw']}/{new_fn}")
+                    os.rename(f"{self.config['Paths']['raw']}/{old_fn}",f"{self.config['Paths']['raw']}/{new_fn}")
                     
                 # Resample to get timestamp on consistent half-hourly intervals
                 df = df.resample('30T').first()
@@ -150,7 +253,7 @@ class read_ALL():
                     self.files = df.sort_index()#ascending=False)
                     self.files.to_csv(self.config['Paths']['meta_dir']+self.config['filenames']['file_inventory'])
         else:
-            print(f"Not a valid directory: {self.config['Paths']['raw_path']}")
+            print(f"Not a valid directory: {self.config['Paths']['raw']}")
     
         self.Parser = handleFiles.Parse(self.config)
         if hasattr(self, 'files'):
@@ -165,13 +268,13 @@ class read_ALL():
                     with Pool(processes=processes) as pool:
                         max_chunksize=4
                         chunksize=min(int(np.ceil(len(files)/processes)),max_chunksize)
-                        for out in pool.imap(partial(handleFiles.copy_files,in_dir=dir,out_dir=self.config['Paths']['raw_path'],fileInfo=self.config[self.fileType],year=self.year,month=self.month),files,chunksize=chunksize):
+                        for out in pool.imap(partial(handleFiles.copy_files,in_dir=dir,out_dir=self.config['Paths']['raw'],fileInfo=self.config[self.fileType],year=self.year,month=self.month),files,chunksize=chunksize):
                             pb.step()
                         pool.close()
                         pb.close()
                 else:
                     for filename in files:
-                        handleFiles.copy_files(filename,dir,self.config['Paths']['raw_path'],fileInfo=self.config[self.fileType],year=self.year,month=self.month)
+                        handleFiles.copy_files(filename,dir,self.config['Paths']['raw'],fileInfo=self.config[self.fileType],year=self.year,month=self.month)
 
 
     def makeEmpty(self,type='object',ixName='TIMESTAMP'):
@@ -341,7 +444,7 @@ if __name__ == '__main__':
 
     CLI.add_argument("--copyFrom",nargs="?",type=str,default=None,)
 
-    CLI.add_argument("--copyTag",nargs="?",type=str,default='',)
+    CLI.add_argument("--searchTag",nargs="?",type=str,default='',)
 
     CLI.add_argument("--timeShift",nargs="?",type=int,default=None,)
   
@@ -358,7 +461,7 @@ if __name__ == '__main__':
     args = CLI.parse_args()
 
     for siteID in args.siteID:
-        ra = read_ALL(siteID,fileType=args.fileType,metadataUpdates=args.metadataUpdates,copyFrom=args.copyFrom,copyTag=args.copyTag,timeShift=args.timeShift)
+        ra = read_ALL(siteID,fileType=args.fileType,metadataUpdates=args.metadataUpdates,copyFrom=args.copyFrom,searchTag=args.searchTag,timeShift=args.timeShift)
         for year in args.Years:
 
             for month in args.Month:
