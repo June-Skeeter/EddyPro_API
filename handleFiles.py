@@ -48,20 +48,26 @@ def copy_and_check_files(filename,in_dir,out_dir,fileInfo,byYear=True,byMonth=Tr
     else: 
         return([None,None,None])
     
-# def check_file(filename=None,fileInfo=None):
-#     if filename == None or fileInfo == None:
-#         return(None,None,None)
-#     if filename.endswith(fileInfo['extension']) and fileInfo['tag'] in filename:
-#         filename = filename.rsplit('.',1)[0]
-#         # all_files.append(file)
-#         timestamp_info = re.search(fileInfo['search'], filename).group(0)
-#         timestamp_info = datetime.strptime(timestamp_info,fileInfo['format'])
-#         name_pattern = filename.replace(timestamp_info,fileInfo['ep_date_pattern'])+'.'+fileInfo['extension']
-#         return(timestamp_info,filename,name_pattern)
+def readFile(file):
+    timestamp=file[0]
+    filepath=file[1]
+    if filepath.endswith('.ghg'):
+        out = extractGHG(filepath)
+    else:
+        out = False
+
+def extractGHG(filepath):
+    return(True)
+    
+# class Parse():
+#     def __init__(self,):
+#         self.ini = ini
+    
+
 
 # Parse ghg or dat files
 # Called from preProcessing module, defined here to allow execution in parallel
-class Parse():
+class Parse_old():
     def __init__(self,ini):
         self.ini = ini
         self.max_missing = float(eval(self.ini['RawProcess_Settings']['max_lack']))*.01

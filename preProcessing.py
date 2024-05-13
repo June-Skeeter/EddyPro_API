@@ -26,8 +26,6 @@ importlib.reload(handleFiles)
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 
-
-
 class preProcessing():
     os.chdir(dname)
     def __init__(self,siteID,fileType='ghg',processes=os.cpu_count(),Testing=0):
@@ -35,7 +33,17 @@ class preProcessing():
         self.fileType = fileType
         self.Testing = Testing
         self.processes = processes
-        # Read configurations
+
+        # Concatenate and read the ini files
+        # LICOR uses .ini format to define .metadata and .eddypro files
+        inis = ['Metadata_Instructions.ini','EP_Dynamic_Updates.ini']
+
+        ini_file = ['ini_files/'+ini for ini in inis]
+        self.EP_ini = configparser.ConfigParser()
+        self.EP_ini.read(ini_file)
+
+
+        # Read yaml configurations
         with open('config_files/config.yml') as yml:
             self.config = yaml.safe_load(yml)
             self.config['siteID'] = siteID
@@ -44,15 +52,20 @@ class preProcessing():
                     self.config.update(yaml.safe_load(yml))
             else:
                 sys.exit(f"Missing {'config_files/user_path_definitions.yml'}")
+        # Setup paths using definitions from config file
         self.config['Paths'] = {}
         for key,val in self.config['RelativePaths'].items():
             self.config['Paths'][key] = eval(val)
 
+        # Read the inventory if it exists already
+        # Create the metadata_directory if it doesn't exist
         self.config['fileInventory']=self.config['Paths']['meta_dir']+self.config['filenames']['file_inventory']
-        try:
+        if os.path.isfile(self.config['fileInventory']):
             self.fileInventory = pd.read_csv(self.config['fileInventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
-        except:
-            pass
+        else:
+            os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
+
+
 
     def searchRawDir(self,copyFrom=None,searchTag='',timeShift=None):
         # Build the file inventory of the "raw" directory
@@ -120,11 +133,38 @@ class preProcessing():
         for i,row in self.fileInventory.loc[((self.fileInventory['Flag']=='Incomplete Record')
                                 &(~self.fileInventory['filename'].str.contains('_incomplete')))].iterrows():
             old_fn = row['filename']
+            dpth = f"{self.config['Paths']['raw']}/{i.year}/{str(i.month).zfill(2)}/"
             new_fn = self.fileInventory.loc[self.fileInventory.index==i,'filename']=old_fn.split('.')[0]+'_incomplete.'+old_fn.split('.')[1]
-            if os.path.isfile(f"{self.config['Paths']['raw']}/{new_fn}"):
-                os.remove(f"{self.config['Paths']['raw']}/{new_fn}")
-            os.rename(f"{self.config['Paths']['raw']}/{old_fn}",f"{self.config['Paths']['raw']}/{new_fn}")
+            if os.path.isfile(f"{dpth}/{new_fn}"):
+                os.remove(f"{dpth}/{new_fn}")
+            os.rename(f"{dpth}/{old_fn}",f"{dpth}/{new_fn}")
+    
+    def readFiles(self):
+        pathList=(self.config['Paths']['raw']+self.fileInventory.index.strftime('%Y/%m/')+self.fileInventory['filename'])
         
+        if (__name__ == 'preProcessing' or __name__ == '__main__') and self.processes>1:
+            # run routine in parallel
+            pb = progressbar(len(pathList),'')
+            with Pool(processes=self.processes) as pool:
+                max_chunksize=4
+                chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
+                for out in pool.imap(partial(handleFiles.readFile),pathList.items(),chunksize=chunksize):
+                    pb.step()
+                    print(out)
+                pool.close()
+                pb.close()
+        else:
+            # run routine sequentially
+            for i,file in pathList.items():
+                # if i < self.Testing or self.Testing == 0:
+                out = handleFiles.readFile((i,file))
+                print(out)
+                    # out = handleFiles.copy_and_check_files(filename,dir,self.config['Paths']['raw'],fileInfo=self.config[self.fileType])
+                    # douot.append(out)
+
+        # for i,row in self.fileInventory.iterrows():
+        #     dpth = f"{self.config['Paths']['raw']}/{i.year}/{str(i.month).zfill(2)}/"
+        #     print(dpth,row['filename'])
 
 class read_ALL():
     def __init__(self,siteID,reset=0,fileType='ghg',copyFrom=None,searchTag='',metadataTemplate=[],metadataUpdates=None,timeShift=None):
