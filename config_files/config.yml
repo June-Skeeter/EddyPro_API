@@ -1,14 +1,7 @@
-# These paths are defaults (examples) 
-# They will be overwritten with the contents of user_path_definitions.yml (if present)
-RootDirs:
-  Database: C:/Database/
-  Highfreq: C:/highfreq/
-  EddyPro: C:/Program Files/LI-COR/EddyPro-7.0.9/bin/
-  Outputs: C:/temp/
-  Datadump: X:/
 
 # These will be dynamically updated using evaluate statements
-# self.config refers to the API Object Configuration settings which
+# self.config refers to the API Configuration settings (this file + all other .yml files)
+# RootDirs is defined in user_path_definitions.yml
 # Is a concatenation of all .yml and .ini configuration inputs
 RelativePaths:
   # Path to raw EC data will be appended with YYYY/MM (Year/Month) following EddyPro's default expectation

@@ -28,13 +28,12 @@ dname = os.path.dirname(abspath)
 
 class preProcessing():
     os.chdir(dname)
-    def __init__(self,siteID,fileType='ghg',metaDataTemplate=None,processes=os.cpu_count(),Testing=0):
+    def __init__(self,siteID,fileType='ghg',metaDataTemplate=None,processes=os.cpu_count(),Testing=0,reset=False):
         self.siteID = siteID
         self.fileType = fileType
         self.Testing = Testing
         self.processes = processes
         
-
         # Concatenate and read the ini files
         # LICOR uses .ini format to define .metadata and .eddypro files
         inis = ['Metadata_Instructions.ini','EP_Dynamic_Updates.ini']
@@ -42,7 +41,6 @@ class preProcessing():
         ini_file = ['ini_files/'+ini for ini in inis]
         self.EP_ini = configparser.ConfigParser()
         self.EP_ini.read(ini_file)
-
 
         # Read yaml configurations
         with open('config_files/config.yml') as yml:
@@ -53,6 +51,15 @@ class preProcessing():
                     self.config.update(yaml.safe_load(yml))
             else:
                 sys.exit(f"Missing {'config_files/user_path_definitions.yml'}")
+
+        for f in ['Metadata_Instructions']:
+            if os.path.isfile(f'config_files/{f}.yml'):
+                with open(f'config_files/{f}.yml') as yml:
+                    self.config[f] = yaml.safe_load(yml)
+            else:
+                sys.exit(f"Missing {f'config_files/{f}.yml'}")
+
+
         # Setup paths using definitions from config file
         self.config['Paths'] = {}
         for key,val in self.config['RelativePaths'].items():
@@ -61,6 +68,12 @@ class preProcessing():
         # Read the inventory if it exists already
         # Create the metadata_directory if it doesn't exist
         self.config['fileInventory']=self.config['Paths']['meta_dir']+self.config['filenames']['file_inventory']
+
+        if reset == True:
+            for d in [self.config['fileInventory']]:
+                if os.path.isfile(d):
+                    os.remove(d)
+
         if os.path.isfile(self.config['fileInventory']):
             self.fileInventory = pd.read_csv(self.config['fileInventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
         else:
@@ -74,46 +87,59 @@ class preProcessing():
         # Build the file inventory of the "raw" directory
         # Copy new files to raw if needed with option shift the timestamp 
         # e.g., copy data and rename using timestamp at end of interval instead of start
+        # timeShift will only be applied to data copied from another directory
         search_dirs = [self.config['Paths']['raw']]
+        shiftTime = [None]
         if copyFrom is not None:
             search_dirs.append(copyFrom)
+            shiftTime.append(timeShift)
+
         T1 = time.time()
-        self.config[self.fileType]['searchTag'] = searchTag
-        self.config[self.fileType]['timeShift'] = timeShift
+        fileInfo = self.config[self.fileType]
+        fileInfo['searchTag'] = searchTag
+
         # Walk the search directories
-        for search in search_dirs:
-            for dir, _, files in os.walk(search):
-                if len(files)>0:
+        for search,timeShift in zip(search_dirs,shiftTime):
+            fileInfo['timeShift'] = timeShift
+            for dir, _, fileList in os.walk(search):
+                # Exclude files that have already been processed from fileList
+                if hasattr(self,'fileInventory'):
+                    source_names = [os.path.basename(f) for f in self.fileInventory['source'].values]
+                else:
+                    source_names = []
+                fileList = [f for f in fileList if f not in source_names]
+                if len(fileList)>0:
                     print(f'Searching {dir}')
                     douot = []
                     if (__name__ == 'preProcessing' or __name__ == '__main__') and self.processes>1:
                         # run routine in parallel
-                        pb = progressbar(len(files),'')
+                        pb = progressbar(len(fileList),'')
                         with Pool(processes=self.processes) as pool:
-                            max_chunksize=4
-                            chunksize=min(int(np.ceil(len(files)/self.processes)),max_chunksize)
-                            for out in pool.imap(partial(handleFiles.copy_and_check_files,in_dir=dir,out_dir=self.config['Paths']['raw'],fileInfo=self.config[self.fileType]),files,chunksize=chunksize):
+                            max_chunksize=10
+                            chunksize=min(int(np.ceil(len(fileList)/self.processes)),max_chunksize)
+                            for out in pool.imap(partial(handleFiles.copy_and_check_files,in_dir=dir,out_dir=self.config['Paths']['raw'],fileInfo=fileInfo),fileList,chunksize=chunksize):
                                 pb.step()
                                 douot.append(out)
                             pool.close()
                             pb.close()
                     else:
                         # run routine sequentially
-                        for i,filename in enumerate(files):
+                        for i,filename in enumerate(fileList):
                             if i < self.Testing or self.Testing == 0:
-                                out = handleFiles.copy_and_check_files(filename,dir,self.config['Paths']['raw'],fileInfo=self.config[self.fileType])
+                                out = handleFiles.copy_and_check_files(filename,dir,self.config['Paths']['raw'],fileInfo=fileInfo)
                                 douot.append(out)
                     # Dump results to inventory
-                    df = pd.DataFrame(columns=['TIMESTAMP','filename','name_pattern'],data=douot)
+                    # source and filename will be different if a timeShift is applied when copying
+                    df = pd.DataFrame(columns=['TIMESTAMP','source','filename','name_pattern'],data=douot)
                     # Add empty columns for auxillary information
                     df[['Flag','MetaDataFile','Update']]=''
                     df['setup_ID']=np.nan
                     df['TIMESTAMP'] = pd.DatetimeIndex(df['TIMESTAMP'])
                     df = df.set_index('TIMESTAMP')
-                    # drop rows where all data are missing
+                    # drop rows where filename_final are missing
                     df = df.loc[df['filename'].isnull()==False]
                     # Merge with existing inventory
-                    if hasattr(self,'fileList'):      
+                    if hasattr(self,'fileInventory'):      
                         self.fileInventory = pd.concat([self.fileInventory,df])
                     else:
                         self.fileInventory = df
@@ -121,11 +147,14 @@ class preProcessing():
         self.fullFilesOnly()
         # Resample to get timestamp on consistent half-hourly intervals
         self.fileInventory = self.fileInventory.resample('30T').first()
+        # Fill empty string columns
+        self.fileInventory[['source','filename','name_pattern']] = self.fileInventory[['source','filename','name_pattern']].fillna('N/A')
+
         # Sort so that oldest files get processed first
         self.fileInventory = self.fileInventory.sort_index()#ascending=False)
         # Save inventory
         self.fileInventory.to_csv(self.config['fileInventory'])
-        print('Files Copying Complete, time elapsed: ',time.time()-T1)
+        print('Files Search Complete, time elapsed: ',time.time()-T1)
 
     def fullFilesOnly(self):
         # Flag timestamps with incomplete records
@@ -134,7 +163,7 @@ class preProcessing():
             (self.fileInventory.index.second!=0)),'Flag'] = 'Incomplete Record'
         # Loop through incomplete records and flag/rename
         for i,row in self.fileInventory.loc[((self.fileInventory['Flag']=='Incomplete Record')
-                                &(~self.fileInventory['filename'].str.contains('_incomplete')))].iterrows():
+                                &(self.fileInventory['filename'].str.contains('_incomplete')==False))].iterrows():
             old_fn = row['filename']
             dpth = f"{self.config['Paths']['raw']}/{i.year}/{str(i.month).zfill(2)}/"
             new_fn = self.fileInventory.loc[self.fileInventory.index==i,'filename']=old_fn.split('.')[0]+'_incomplete.'+old_fn.split('.')[1]
@@ -143,8 +172,12 @@ class preProcessing():
             os.rename(f"{dpth}/{old_fn}",f"{dpth}/{new_fn}")
     
     def readFiles(self):
+        T1 = time.time()
+        print('Reading Data')
+        # Parse down to just files that need to be read
+        to_process = self.fileInventory.loc[self.fileInventory['filename'].str.endswith(self.fileType)].copy()
         # Call file handler to parse files in parallel (default) or sequentially for troubleshooting
-        pathList=(self.config['Paths']['raw']+self.fileInventory.index.strftime('%Y/%m/')+self.fileInventory['filename'])
+        pathList=(self.config['Paths']['raw']+to_process.index.strftime('%Y/%m/')+to_process['filename'])
         self.data = pd.DataFrame()
         self.metaData = pd.DataFrame()
         md_out = []
@@ -167,6 +200,11 @@ class preProcessing():
                 out = self.Parser.readFile((i,file))
                 self.data = pd.concat([self.data,out[0]])
                 self.metaData = pd.concat([self.metaData,out[1]])
+        
+        print('Reading Complete, time elapsed: ',time.time()-T1)
+
+    # def inspectMetadata(self):
+        # for 
 
 
 class read_ALL():

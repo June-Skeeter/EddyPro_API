@@ -5,49 +5,48 @@ import os
 import re
 import csv
 import sys
-from pathlib import Path
+import shutil
 import zipfile
-import configparser
+import datetime
+import traceback
+import importlib
 import numpy as np
 import pandas as pd
+import configparser
 from pathlib import Path
 from io import TextIOWrapper
-import xml.etree.ElementTree as ET
-import datetime
-import importlib
-import traceback
-import shutil
-
 import readLiConfigFiles as rLCF
-importlib.reload(rLCF)
+import xml.etree.ElementTree as ET
 from HelperFunctions import EventLog as eL
+importlib.reload(rLCF)
 
 # Copy ghg or dat files and shift timestamp in file name if needed
 # useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
 # Called from preProcessing module, defined here to allow copying to be done in parallel
-def copy_and_check_files(filename,in_dir,out_dir,fileInfo,byYear=True,byMonth=True):
-    if filename.endswith(fileInfo['extension']) and fileInfo['searchTag'] in filename:
-        srch = re.search(fileInfo['search'], filename.rsplit('.',1)[0]).group(0)
+# Compares against existing data to avoid re-copying files
+def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True,checkList=[]):
+    if inName.endswith(fileInfo['extension']) and fileInfo['searchTag'] in inName and inName not in checkList:
+        srch = re.search(fileInfo['search'], inName.rsplit('.',1)[0]).group(0)
         if srch is not None:
-            name_pattern = filename.replace(srch,fileInfo['ep_date_pattern'])
+            name_pattern = inName.replace(srch,fileInfo['ep_date_pattern'])
             TIMESTAMP =  datetime.datetime.strptime(srch,fileInfo['format'])
             if fileInfo['timeShift'] is not None:
                 TIMESTAMP = TIMESTAMP+datetime.timedelta(minutes=fileInfo['timeShift'])
                 timeString = datetime.datetime.strftime(TIMESTAMP,fileInfo['format'])
-                outName = filename.replace(srch,timeString)
+                outName = inName.replace(srch,timeString)
             else:
-                outName=filename
+                outName=inName
             if byYear==True:
                 out_dir = f'{out_dir}/{str(TIMESTAMP.year)}/'
                 if byMonth==True:
                     out_dir = f'{out_dir}{str(TIMESTAMP.month).zfill(2)}/'
             if os.path.isfile(f'{out_dir}/{outName}')==False:
                 os.makedirs(out_dir, exist_ok=True)
-                shutil.copy2(f"{in_dir}/{filename}",f"{out_dir}/{outName}")
-            return([TIMESTAMP,filename,name_pattern])
-        else: return([None,None,None])
+                shutil.copy2(f"{in_dir}/{inName}",f"{out_dir}/{outName}")
+            return([TIMESTAMP,f"{in_dir}/{inName}",outName,name_pattern])
+        else: return([None,None,None,None])
     else: 
-        return([None,None,None])
+        return([None,None,None,None])
     
 class Parser():
     def __init__(self,config,metaDataTemplate=None):
@@ -57,7 +56,6 @@ class Parser():
             self.metaDataTemplate,self.fileDescription = self.readMetaData(open(metaDataTemplate))
             self.fileDescription.update(self.config['dat'])
 
-
     def readFile(self,file):
         timestamp=file[0]
         filepath=file[1]
@@ -66,11 +64,10 @@ class Parser():
         else:
             d_agg = self.readData(filepath,self.fileDescription,timestamp)
             metaData = self.metaDataTemplate.copy()
-        del metaData['DEFAULT']
-        mdDF = {(k1,k2):val for k1 in metaData.keys() for k2,val in metaData[k1].items()}
-        mdDF = pd.DataFrame(mdDF,index=[timestamp])
-        mdDF.index.name = 'TIMESTAMP'
-        return(d_agg,mdDF)
+        
+        metaData = pd.DataFrame(metaData,index=[timestamp])
+        metaData.index.name = 'TIMESTAMP'
+        return(d_agg,metaData)
 
     def extractGHG(self,filepath,timestamp):
         base = os.path.basename(filepath).rstrip('.ghg')
@@ -94,6 +91,8 @@ class Parser():
     def readMetaData(self,metaDataFile):
         # Parse the .metadata file included in the .ghg file
         # Or parse a userdefined template
+        # Extract file description to parse data
+        # Dump relevant metaData values to dataframe for tracking
         metaData = configparser.ConfigParser()
         metaData.read_file(metaDataFile)
         metaData = {key:dict(metaData[key]) for key in metaData.keys()}
@@ -101,8 +100,12 @@ class Parser():
         # Isolate and parse file description for reading data files
         fileDescription = metaData['FileDescription'].copy()
         fileDescription['delimiter'] = self.config['delimiters'][fileDescription['separator']].encode('ascii','ignore').decode('unicode_escape')
-        
+
+        # Reformat for dumping to DataFrame        
+        metaData = {(k1,k2):val for k1 in metaData.keys() for k2,val in metaData[k1].items()}
         return(metaData,fileDescription)
+    
+
     
     def readData(self,dataFile,fileDescription,timestamp):
         data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'])
@@ -119,9 +122,6 @@ class Parser():
         d_agg['Timestamp'] = timestamp
         d_agg.set_index('Timestamp', append=True, inplace=True)
         d_agg = d_agg.reorder_levels(['Timestamp',None]).unstack()
-        # print(d_agg)
-        # d_agg = d_agg.to_dict()#orient='tight')
-        # print(d_agg)
         return(d_agg)
 
         
