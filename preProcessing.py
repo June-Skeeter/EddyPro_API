@@ -7,13 +7,13 @@ import sys
 import yaml
 import time
 import shutil
+import fnmatch
 import argparse
 import handleFiles
 import importlib
 import numpy as np
 import pandas as pd
 import configparser
-import time
 from pathlib import Path
 from datetime import datetime
 from functools import partial
@@ -35,22 +35,14 @@ class preProcessing():
         self.siteID = siteID
         self.fileType = fileType
         self.Testing = Testing
+
         # Turn of multiprocessing when testing
-        if self.Testing > 0:
-            self.processes = 1
-        else:
-            self.processes = processes
+        if self.Testing > 0: self.processes = 1
+        else: self.processes = processes
         
         # Concatenate and read the ini files
         # LICOR uses .ini format to define .metadata and .eddypro files
         EP_ini_files = [eddyProTemplate,'EP_Dynamic_Updates.ini']
-        # {'default':eddyProTemplate,
-        #                 'dynamicUpdates':'EP_Dynamic_Updates.ini'}
-
-#         self.eddyProSettings = {
-#             file:{key:dict(EP_ini[key]) for key in EP_ini.keys()} for 
-#         }
-# EP_ini_files
 
         ini_file = ['ini_files/'+ini for ini in EP_ini_files]
         EP_ini = configparser.ConfigParser()
@@ -181,7 +173,7 @@ class preProcessing():
         # Resample to get timestamp on consistent half-hourly intervals
         self.fileInventory = self.fileInventory.resample('30T').first()
         # Fill empty string columns
-        self.fileInventory[['source','filename','name_pattern']] = self.fileInventory[['source','filename','name_pattern']].fillna('N/A')
+        self.fileInventory[['source','filename','name_pattern']] = self.fileInventory[['source','filename','name_pattern']].fillna(self.config['naString'])
 
         # Sort so that oldest files get processed first
         self.fileInventory = self.fileInventory.sort_index()#ascending=False)
@@ -241,8 +233,20 @@ class preProcessing():
         self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
         self.metaDataValues.to_csv(self.config['metaDataValues'])
 
-    # def inspectMetadata(self):
-    #     for 
+    def inspectMetadata(self):
+        grouper = [(key,v) 
+                   for key,value in self.config['monitoringInstructions']['metaData']['groupBy'].items() 
+                   for val in value
+                   for v in fnmatch.filter(self.metaDataValues[key].columns,val)]
+        self.metaDataValues[grouper] = self.metaDataValues[grouper].fillna(self.config['naString'])
+        # a,b = 9,10
+
+        # print(grouper[a:b])
+
+        # print(self.metaDataValues[grouper])
+        self.metaDataValues['Group','ID'] = self.metaDataValues.groupby(by=grouper).grouper.group_info[0] + 1
+
+
 
 
 

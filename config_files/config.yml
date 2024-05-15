@@ -44,6 +44,9 @@ aggregation:
   min: True
   count: True
 
+# Value for missing data in text columns
+naString: N/A
+
 templates:
   variableList: ini_files/VariableNames.ini
 
