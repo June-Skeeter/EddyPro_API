@@ -62,8 +62,9 @@ class Parser():
         if filepath.endswith('.ghg'):
             d_agg,metaData = self.extractGHG(filepath,timestamp)
         else:
-            d_agg = self.readData(filepath,self.fileDescription,timestamp)
+            d_agg, d_names = self.readData(filepath,self.fileDescription,timestamp)
             metaData = self.metaDataTemplate.copy()
+            metaData.update(d_names)
         
         metaData = pd.DataFrame(metaData,index=[timestamp])
         metaData.index.name = 'TIMESTAMP'
@@ -85,7 +86,8 @@ class Parser():
                 fileDescription['skip_rows'] = int(fileDescription['header_rows'])-1
                 fileDescription['header_rows'] = [0]
 
-            d_agg = self.readData(ghgZip.open(ghgInventory['.data']),fileDescription,timestamp)
+            d_agg, d_names = self.readData(ghgZip.open(ghgInventory['.data']),fileDescription,timestamp)
+            metaData.update(d_names)
         return(d_agg,metaData)
 
     def readMetaData(self,metaDataFile):
@@ -108,21 +110,29 @@ class Parser():
 
     
     def readData(self,dataFile,fileDescription,timestamp):
-        data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'])
+        if 'na_values' in fileDescription.keys():
+            data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
+        else:
+            data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'])
+            
         if fileDescription['data_label'] != 'Not set':
             # .ghg data files contain a "DATA" label if first column which isn't needed
             data = data.drop(data.columns[0],axis=1)
-
         # Parse units from metadata if not included in headers
         if len(fileDescription['header_rows']) == 1:
             unit_list = [value for key,value in fileDescription.items() if 'unit_in' in key]
             data.columns = [data.columns,unit_list]
+
+        # generate dict of column names to add back into Metadata
+        col_names = {}
+        for i,c in enumerate(data.columns.get_level_values(0)):
+            col_names[('Custom',f'col_{i+1}_header_name')] = c
         data = data._get_numeric_data()
         d_agg = data.agg(self.agg)
         d_agg['Timestamp'] = timestamp
         d_agg.set_index('Timestamp', append=True, inplace=True)
         d_agg = d_agg.reorder_levels(['Timestamp',None]).unstack()
-        return(d_agg)
+        return(d_agg,col_names)
 
         
 # def get_delimiter(file_path, bytes = 4096):

@@ -29,10 +29,15 @@ dname = os.path.dirname(abspath)
 class preProcessing():
     os.chdir(dname)
     def __init__(self,siteID,fileType='ghg',metaDataTemplate=None,processes=os.cpu_count(),Testing=0,reset=False):
+
         self.siteID = siteID
         self.fileType = fileType
         self.Testing = Testing
-        self.processes = processes
+        # Turn of multiprocessing when testing
+        if self.Testing > 0:
+            self.processes = 1
+        else:
+            self.processes = processes
         
         # Concatenate and read the ini files
         # LICOR uses .ini format to define .metadata and .eddypro files
@@ -67,17 +72,31 @@ class preProcessing():
 
         # Read the inventory if it exists already
         # Create the metadata_directory if it doesn't exist
-        self.config['fileInventory']=self.config['Paths']['meta_dir']+self.config['filenames']['file_inventory']
+        self.config['fileInventory']=self.config['Paths']['meta_dir']+self.config['filenames']['fileInventory']
+        self.config['rawDataStatistics']=self.config['Paths']['meta_dir']+self.config['filenames']['rawDataStatistics']
+        self.config['metaDataValues']=self.config['Paths']['meta_dir']+self.config['filenames']['metaDataValues']
 
+        # Reset routine (for testing only, should be removed from production?)
         if reset == True:
-            for d in [self.config['fileInventory']]:
-                if os.path.isfile(d):
-                    os.remove(d)
+            RESET = input(f"WARNING!! You are about to complete a reset: type SOFT RESET to delete all contents of: {self.config['Paths']['meta_dir']}, type HARD RESET to delete all contents of: {self.config['Paths']['meta_dir']} **and** {self.config['Paths']['raw']}\n, provide any other input + enter to exit the application")
+            if RESET == 'SOFT RESET' or RESET == 'HARD RESET':
+                CONFIRM = input(F"WARNING!! You selected {RESET}, type CONFRIM to proceed, provide any other input + enter to exit the application")
+                if CONFIRM == 'CONFIRM':
+                    shutil.rmtree(self.config['Paths']['meta_dir'])
+                    if RESET == 'HARD RESET':
+                        shutil.rmtree(self.config['Paths']['raw'])
+                else:
+                    sys.exit()
+            else:
+                sys.exit()
+
+        os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
+        os.makedirs(self.config['Paths']['raw'],exist_ok=True)
 
         if os.path.isfile(self.config['fileInventory']):
             self.fileInventory = pd.read_csv(self.config['fileInventory'],parse_dates=['TIMESTAMP'],index_col='TIMESTAMP')
-        else:
-            os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
+            self.rawDataStatistics = pd.read_csv(self.config['rawDataStatistics'],parse_dates=[0],index_col=[0],header=[0,1,2])
+            self.metaDataValues = pd.read_csv(self.config['metaDataValues'],parse_dates=[0],index_col=[0],header=[0,1])
             
         # Initiate parser class
         # Defined externally to facilitate parallel processing
@@ -178,8 +197,8 @@ class preProcessing():
         to_process = self.fileInventory.loc[self.fileInventory['filename'].str.endswith(self.fileType)].copy()
         # Call file handler to parse files in parallel (default) or sequentially for troubleshooting
         pathList=(self.config['Paths']['raw']+to_process.index.strftime('%Y/%m/')+to_process['filename'])
-        self.data = pd.DataFrame()
-        self.metaData = pd.DataFrame()
+        self.rawDataStatistics = pd.DataFrame()
+        self.metaDataValues = pd.DataFrame()
         md_out = []
         if (__name__ == 'preProcessing' or __name__ == '__main__') and self.processes>1:
             # run routine in parallel
@@ -189,8 +208,8 @@ class preProcessing():
                 chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
                 for out in pool.imap(partial(self.Parser.readFile),pathList.items(),chunksize=chunksize):
                     pb.step()
-                    self.data = pd.concat([self.data,out[0]])
-                    self.metaData = pd.concat([self.metaData,out[1]])
+                    self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
+                    self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
                 pool.close()
                 pb.close()
         else:
@@ -198,11 +217,13 @@ class preProcessing():
             for i,file in pathList.items():
                 # if i < self.Testing or self.Testing == 0:
                 out = self.Parser.readFile((i,file))
-                self.data = pd.concat([self.data,out[0]])
-                self.metaData = pd.concat([self.metaData,out[1]])
+                self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
+                self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
         
         print('Reading Complete, time elapsed: ',time.time()-T1)
-
+        
+        self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
+        self.metaDataValues.to_csv(self.config['metaDataValues'])
     # def inspectMetadata(self):
         # for 
 

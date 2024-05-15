@@ -22,7 +22,9 @@ RelativePaths:
 #   eddypro_output: '**write_data_dir**/EP_Test_Runs/'
 
 filenames:
-  file_inventory: fileInventory.csv
+  fileInventory: fileInventory.csv
+  rawDataStatistics: rawDataStatistics.csv
+  metaDataValues: metaDataValues.csv
   # biomet_file: Biomet.csv
   # raw_means: rawMeans.csv
   # dynamic_metadata: dynamicMetadata.csv
@@ -62,6 +64,10 @@ dat:
   search: ([0-9]{4}\_[0-9]{2}\_[0-9]{2}\_[0-9]{4})
   format: '%Y_%m_%d_%H%M'
   ep_date_pattern: yyyy_mm_dd_HHMM
+  # Must provide some extra metadata when not using .ghg format
+  # List of values to fill with NaNs
+  na_values: 
+  - NAN
   # rows to skip (start count form 0)
   skip_rows: [0,3]
   # header rows (after)
