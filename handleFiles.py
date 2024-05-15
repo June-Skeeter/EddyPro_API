@@ -107,8 +107,6 @@ class Parser():
         metaData = {(k1,k2):val for k1 in metaData.keys() for k2,val in metaData[k1].items()}
         return(metaData,fileDescription)
     
-
-    
     def readData(self,dataFile,fileDescription,timestamp):
         if 'na_values' in fileDescription.keys():
             data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
@@ -126,7 +124,7 @@ class Parser():
         # generate dict of column names to add back into Metadata
         col_names = {}
         for i,c in enumerate(data.columns.get_level_values(0)):
-            col_names[('Custom',f'col_{i+1}_header_name')] = c
+            col_names[('FileDescription',f'col_{i+1}_header_name')] = c
         data = data._get_numeric_data()
         d_agg = data.agg(self.agg)
         d_agg['Timestamp'] = timestamp
