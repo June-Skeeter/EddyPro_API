@@ -34,18 +34,12 @@ filenames:
   # eddypro_rp: eddypro_rp.exe
   # eddypro_fcc: eddypro_fcc.exe
 
-aggregation:
-  # Will yield the following statistics for all raw traces where True
-  # See options here: https://pandas.pydata.org/pandas-docs/stable/reference/groupby.html#dataframegroupby-computations-descriptive-stats
-  mean: True
-  std: True
-  median: True
-  max: True
-  min: True
-  count: True
-
 # Value for missing data in text columns
-naString: N/A
+# Idea is to use a non-default NaN value so that text columns are preserved where desired
+# Pandas defaults to object datatype with mixed string/NaN columns
+stringTags:
+  NaN: '~'
+  exclude: _Exclude_
 
 templates:
   variableList: ini_files/VariableNames.ini
@@ -81,7 +75,7 @@ biom_timestamp:
   name: TIMESTAMP_1
   format: '%Y-%m-%d %H%M'
 
-Calibration_Info:
-  # Set to True to include (only where it exists)
-  # Skipping will speed up
-  readCal:  True
+# Calibration_Info:
+#   # Set to True to include (only where it exists)
+#   # Skipping will speed up
+#   readCal:  True

@@ -24,7 +24,10 @@ importlib.reload(rLCF)
 # useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
 # Called from preProcessing module, defined here to allow copying to be done in parallel
 # Compares against existing data to avoid re-copying files
-def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True,checkList=[]):
+# if dateRange provided, will limit to files within the range
+def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True,checkList=[],dateRange=None):
+    # return empty list if 
+    empty = [None,None,None,None]
     if inName.endswith(fileInfo['extension']) and fileInfo['searchTag'] in inName and inName not in checkList:
         srch = re.search(fileInfo['search'], inName.rsplit('.',1)[0]).group(0)
         if srch is not None:
@@ -36,22 +39,27 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
                 outName = inName.replace(srch,timeString)
             else:
                 outName=inName
+            
             if byYear==True:
                 out_dir = f'{out_dir}/{str(TIMESTAMP.year)}/'
                 if byMonth==True:
                     out_dir = f'{out_dir}{str(TIMESTAMP.month).zfill(2)}/'
-            if os.path.isfile(f'{out_dir}/{outName}')==False:
-                os.makedirs(out_dir, exist_ok=True)
-                shutil.copy2(f"{in_dir}/{inName}",f"{out_dir}/{outName}")
-            return([TIMESTAMP,f"{in_dir}/{inName}",outName,name_pattern])
-        else: return([None,None,None,None])
-    else: 
-        return([None,None,None,None])
+            
+            if dateRange is None or (TIMESTAMP >= dateRange.min() and TIMESTAMP <= dateRange.max()):
+                if os.path.isfile(f'{out_dir}/{outName}')==False:
+                    os.makedirs(out_dir, exist_ok=True)
+                    shutil.copy2(f"{in_dir}/{inName}",f"{out_dir}/{outName}")
+                return([TIMESTAMP,f"{in_dir}/{inName}",outName,name_pattern])
+            else:return(empty)
+        else:return(empty)
+    # return the empty list if any condition failed
+    return(empty)
     
 class Parser():
     def __init__(self,config,metaDataTemplate=None):
         self.config = config
-        self.agg = [key for key, value in self.config['aggregation'].items() if value is True]
+        # Define statistics to aggregate raw data by, see configuration
+        self.agg = [key for key, value in self.config['monitoringInstructions']['dataAggregation'].items() if value is True]
         if metaDataTemplate is not None:
             self.metaDataTemplate,self.fileDescription = self.readMetaData(open(metaDataTemplate))
             self.fileDescription.update(self.config['dat'])
@@ -108,6 +116,8 @@ class Parser():
         return(metaData,fileDescription)
     
     def readData(self,dataFile,fileDescription,timestamp):
+        # read the raw high frequency data
+        # parse the column names and output desired aggregation statistics for each raw data file
         if 'na_values' in fileDescription.keys():
             data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
         else:
@@ -124,18 +134,12 @@ class Parser():
         # generate dict of column names to add back into Metadata
         col_names = {}
         for i,c in enumerate(data.columns.get_level_values(0)):
-            col_names[('FileDescription',f'col_{i+1}_header_name')] = c
+            col_names[('Custom',f'col_{i+1}_header_name')] = c
+
+        # Generate the aggregation statistics, but only for numeric columns
         data = data._get_numeric_data()
         d_agg = data.agg(self.agg)
         d_agg['Timestamp'] = timestamp
         d_agg.set_index('Timestamp', append=True, inplace=True)
         d_agg = d_agg.reorder_levels(['Timestamp',None]).unstack()
         return(d_agg,col_names)
-
-        
-# def get_delimiter(file_path, bytes = 4096):
-#     # Autodetect file delimiter
-#     sniffer = csv.Sniffer()
-#     data = open(file_path, "r").read(bytes)
-#     delimiter = sniffer.sniff(data).delimiter
-#     return (delimiter)
