@@ -5,7 +5,8 @@
 # Rules
 #   groupBy: string values used to delineate site configurations, EddyPro runs will be partitioned by configurations
 #   track: numeric values that aggregated by groups but won't raise issues if they change between timestamps
-#   ignore: values are not tracked
+#   pass: representative value for a group is passed but statistics are not calculated
+#         * Changes of these values will *NOT* impact group splits
 
 metaData:
   groupBy:
@@ -48,7 +49,6 @@ metaData:
     Custom:
     - col_*_header_name
   track:
-    # These values are tracked, but won't raise issues if they change between files
     Site:
     - altitude
     - latitude
@@ -58,7 +58,7 @@ metaData:
     - roughness_length
     Instruments:
     - '*_*_tube_flowrate'
-  ignore:
+  pass:
     FileDescription:
     - '*_*_min_value'
     - '*_*_max_value'
@@ -115,10 +115,8 @@ dataFilters:
         # variables correspond to the list of variables defined for the corresponding condition (e.g., Sonic_Filter>condtion_1 defined above)
         # key (e.g., min, max, etc) MUST correspond to a statistic listed under dataAggregation defined above
         # filters can be given as a single string, or a list of different conditions
-        min: Data.loc[groupIX,variables]<-1
-        max: Data.loc[groupIX,variables]>1
-
-  #     range: [-100,100] # If the wind blows this hard > the tower is probably gone already
+        min: Data.loc[groupIX,variables]<-100
+        max: Data.loc[groupIX,variables]>100
   # CO2_Filter:
   #   condition_1:
   #     variable:

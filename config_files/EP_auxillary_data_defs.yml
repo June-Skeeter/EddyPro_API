@@ -9,7 +9,7 @@
 #   EP_biomet is one request; EP_dynamic_metadata is a separate request
 #   This template would produce two .csv files
 
-EP_biomet:
+biometData:
   formatting:
     units_in_header: True
     na_value: -9999
@@ -38,7 +38,7 @@ EP_biomet:
       units: degC
       output_name: Ta_1_1_1
 
-EP_dynamic_metadata:
+dynamicMetadata:
   traces:
     canopy_height:
       units: m

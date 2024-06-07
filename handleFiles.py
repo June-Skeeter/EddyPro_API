@@ -31,7 +31,7 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
     if inName.endswith(fileInfo['extension']) and fileInfo['searchTag'] in inName and inName not in checkList:
         srch = re.search(fileInfo['search'], inName.rsplit('.',1)[0]).group(0)
         if srch is not None:
-            name_pattern = inName.replace(srch,fileInfo['ep_date_pattern'])
+            file_prototype = inName.replace(srch,fileInfo['ep_date_pattern'])
             TIMESTAMP =  datetime.datetime.strptime(srch,fileInfo['format'])
             if fileInfo['timeShift'] is not None:
                 TIMESTAMP = TIMESTAMP+datetime.timedelta(minutes=fileInfo['timeShift'])
@@ -49,7 +49,7 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
                 if os.path.isfile(f'{out_dir}/{outName}')==False:
                     os.makedirs(out_dir, exist_ok=True)
                     shutil.copy2(f"{in_dir}/{inName}",f"{out_dir}/{outName}")
-                return([TIMESTAMP,f"{in_dir}/{inName}",outName,name_pattern])
+                return([TIMESTAMP,f"{in_dir}/{inName}",outName,file_prototype])
             else:return(empty)
         else:return(empty)
     # return the empty list if any condition failed
