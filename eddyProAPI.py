@@ -9,7 +9,7 @@ import time
 import shutil
 import fnmatch
 import argparse
-import handleFiles
+import batchProcessing
 import importlib
 import numpy as np
 import pandas as pd
@@ -20,7 +20,7 @@ from collections import Counter, defaultdict
 from multiprocessing import Pool
 from datetime import datetime,date
 from HelperFunctions import progressbar
-importlib.reload(handleFiles)
+importlib.reload(batchProcessing)
 
 # Directory of current script
 abspath = os.path.abspath(__file__)
@@ -138,7 +138,7 @@ class preProcessing(eddyProAPI):
     def __init__(self,siteID,dateRange=None,**kwargs):
         super().__init__(siteID,dateRange,**kwargs)
         # Initiate parser class, defined externally to facilitate parallel processing
-        self.Parser = handleFiles.Parser(self.config,self.metaDataTemplate)
+        self.Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
         
     def resetInventory(self):
         RESET = input(f"WARNING!! You are about to complete a reset: type SOFT RESET to delete all contents of: {self.config['Paths']['meta_dir']}, type HARD RESET to delete all contents of: {self.config['Paths']['meta_dir']} **and** {self.config['Paths']['raw']}\n, provide any other input + enter to exit the application")
@@ -191,7 +191,7 @@ class preProcessing(eddyProAPI):
                         with Pool(processes=self.processes) as pool:
                             max_chunksize=10
                             chunksize=min(int(np.ceil(len(fileList)/self.processes)),max_chunksize)
-                            for out in pool.imap(partial(handleFiles.copy_and_check_files,in_dir=dir,out_dir=self.config['Paths']['raw'],fileInfo=fileInfo,dateRange=self.dateRange),fileList,chunksize=chunksize):
+                            for out in pool.imap(partial(batchProcessing.copy_and_check_files,in_dir=dir,out_dir=self.config['Paths']['raw'],fileInfo=fileInfo,dateRange=self.dateRange),fileList,chunksize=chunksize):
                                 pb.step()
                                 dout.append(out)
                             pool.close()
@@ -201,7 +201,7 @@ class preProcessing(eddyProAPI):
                         testOffset=0
                         for i,filename in enumerate(fileList):
                             if self.debug == False or i < self.testSet + testOffset or self.testSet == 0:
-                                out = handleFiles.copy_and_check_files(filename,dir,self.config['Paths']['raw'],fileInfo=fileInfo,dateRange=self.dateRange)
+                                out = batchProcessing.copy_and_check_files(filename,dir,self.config['Paths']['raw'],fileInfo=fileInfo,dateRange=self.dateRange)
                                 if out[0] is None and self.testSet > 0:
                                     testOffset += 1
                                 dout.append(out)
@@ -470,7 +470,7 @@ class runEP(eddyProAPI):
                 batchStart = groupTimeStamps[batches==i].min()
                 batchEnd = groupTimeStamps[batches==i].max()+pd.Timedelta(minutes=int(groupInfo['Timing','file_duration','first']))
                 self.makeBatch(groupID,groupInfo,batchStart,batchEnd)
-                
+
     def makeBatch(self,groupID,groupInfo,batchStart,batchEnd):
         file_name = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['eddyProBatchRun'])
         print(f'Creating {file_name}')

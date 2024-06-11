@@ -9,7 +9,7 @@ import time
 import shutil
 import fnmatch
 import argparse
-import handleFiles
+import batchProcessing
 import importlib
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ from collections import Counter
 from multiprocessing import Pool
 from HelperFunctions import sub_path
 from HelperFunctions import progressbar
-importlib.reload(handleFiles)
+importlib.reload(batchProcessing)
 
 # Directory of current script
 abspath = os.path.abspath(__file__)
@@ -102,7 +102,7 @@ class preProcessing(eddyProAPI):
             
         # Initiate parser class
         # Defined externally to facilitate parallel processing
-        self.Parser = handleFiles.Parser(self.config,metaDataTemplate)
+        self.Parser = batchProcessing.Parser(self.config,metaDataTemplate)
         
     def resetInventory(self):
         RESET = input(f"WARNING!! You are about to complete a reset: type SOFT RESET to delete all contents of: {self.config['Paths']['meta_dir']}, type HARD RESET to delete all contents of: {self.config['Paths']['meta_dir']} **and** {self.config['Paths']['raw']}\n, provide any other input + enter to exit the application")
@@ -151,7 +151,7 @@ class preProcessing(eddyProAPI):
                         with Pool(processes=self.processes) as pool:
                             max_chunksize=10
                             chunksize=min(int(np.ceil(len(fileList)/self.processes)),max_chunksize)
-                            for out in pool.imap(partial(handleFiles.copy_and_check_files,in_dir=dir,out_dir=self.config['Paths']['raw'],fileInfo=fileInfo,dateRange=self.dateRange),fileList,chunksize=chunksize):
+                            for out in pool.imap(partial(batchProcessing.copy_and_check_files,in_dir=dir,out_dir=self.config['Paths']['raw'],fileInfo=fileInfo,dateRange=self.dateRange),fileList,chunksize=chunksize):
                                 pb.step()
                                 douot.append(out)
                             pool.close()
@@ -161,7 +161,7 @@ class preProcessing(eddyProAPI):
                         testOffset=0
                         for i,filename in enumerate(fileList):
                             if i < self.Testing + testOffset or self.Testing == 0:
-                                out = handleFiles.copy_and_check_files(filename,dir,self.config['Paths']['raw'],fileInfo=fileInfo,dateRange=self.dateRange)
+                                out = batchProcessing.copy_and_check_files(filename,dir,self.config['Paths']['raw'],fileInfo=fileInfo,dateRange=self.dateRange)
                                 print(out)
                                 if out[0] is None and self.Testing != 0:
                                     testOffset += 1

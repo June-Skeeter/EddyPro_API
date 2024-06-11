@@ -3,12 +3,10 @@
 
 import os
 import re
-import csv
 import sys
 import shutil
 import zipfile
 import datetime
-import traceback
 import importlib
 import subprocess
 import numpy as np
@@ -17,8 +15,8 @@ import configparser
 from pathlib import Path
 from io import TextIOWrapper
 import readLiConfigFiles as rLCF
-import xml.etree.ElementTree as ET
-from HelperFunctions import EventLog as eL
+# import xml.etree.ElementTree as ET
+# from HelperFunctions import EventLog as eL
 importlib.reload(rLCF)
 
 
