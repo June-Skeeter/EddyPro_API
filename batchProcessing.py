@@ -20,8 +20,14 @@ import readLiConfigFiles as rLCF
 importlib.reload(rLCF)
 
 
-def copyWithSubprocess(cmd):    
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+def copyWithSubprocess(source, dest):    
+    cmd=None
+    if sys.platform.startswith("darwin"): 
+        cmd=['cp', source, dest]
+    elif sys.platform.startswith("win"): 
+        cmd=['copy', source, dest]
+    if cmd:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
 # Copy ghg or dat files and shift timestamp in file name if needed
 # useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
@@ -51,16 +57,10 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
             
             if dateRange is None or (TIMESTAMP >= dateRange.min() and TIMESTAMP <= dateRange.max()):
                 source = os.path.abspath(f"{in_dir}/{inName}")
-                dest = os.path.abspath(f'{out_dir}/{outName}')
+                dest = os.path.abspath(f"{out_dir}/{outName}")
                 if os.path.isfile(dest)==False:
                     os.makedirs(out_dir, exist_ok=True)
-                    cmd=None
-                    if sys.platform.startswith("darwin"): 
-                        cmd=['cp', source, dest]
-                    elif sys.platform.startswith("win"): 
-                        cmd=['copy', source, dest]
-                    if cmd:
-                        copyWithSubprocess(cmd)
+                    copyWithSubprocess(source, dest)
                 return([TIMESTAMP,source,outName,file_prototype])
             else:return(empty)
         else:return(empty)
@@ -131,6 +131,7 @@ class Parser():
     def readData(self,dataFile,fileDescription,timestamp):
         # read the raw high frequency data
         # parse the column names and output desired aggregation statistics for each raw data file
+        
         if 'na_values' in fileDescription.keys():
             data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
         else:
@@ -144,6 +145,8 @@ class Parser():
             unit_list = [value for key,value in fileDescription.items() if 'unit_in' in key]
             data.columns = [data.columns,unit_list]
 
+
+        data = data.dropna(how='all',axis=1)
         # generate dict of column names to add back into Metadata
         col_names = {}
         for i,c in enumerate(data.columns.get_level_values(0)):
@@ -156,3 +159,49 @@ class Parser():
         d_agg.set_index('Timestamp', append=True, inplace=True)
         d_agg = d_agg.reorder_levels(['Timestamp',None]).unstack()
         return(d_agg,col_names)
+
+
+class runEddyPro():
+    def __init__(self,epRoot,priority = 'normal',debug=False):
+        self.epRoot = os.path.abspath(epRoot)
+        self.priority = priority
+        self.debug = debug
+
+    def runBatch(self,toRun):
+        toRun = os.path.abspath(toRun)
+        cwd = os.getcwd()
+        pid = os.getpid()
+        batchRoot = os.path.abspath(f'{cwd}/temp/{pid}')
+        try:
+            shutil.rmtree(batchRoot)
+        except:
+            pass
+        bin = os.path.abspath(f'{batchRoot}/bin/')
+        os.makedirs(bin)        
+        copyWithSubprocess(self.epRoot, bin)
+        ini = os.path.abspath(f'{batchRoot}/ini/')
+        os.makedirs(ini)
+        processing = os.path.abspath(f'{ini}/processing.eddypro')
+        print(toRun,processing)
+        copyWithSubprocess(toRun,processing)
+
+        batchFile=os.path.abspath(f'{bin}/runEddyPro.bat')
+        with open(batchFile, 'w') as batch:
+            contents = f'cd {bin}'
+            P = self.priority.lower().replace(' ','')
+            contents+='\nSTART powershell  ".\\eddypro_rp.exe | tee processing_log.txt"'
+            contents+='\nping 127.0.0.1 -n 6 > nul'
+            contents+=f'\nwmic process where name="eddypro_rp.exe" CALL setpriority "{self.priority}"'
+            contents+='\nping 127.0.0.1 -n 6 > nul'
+            contents+='\nEXIT'
+            batch.write(contents)
+
+        subprocess.run(['cmd', '/c', batchFile], capture_output=True)
+
+        copyWithSubprocess(
+            os.path.abspath(f'{bin}/processing_log.txt'),
+            os.path.abspath(toRun.replace('.eddypro','_log.txt'))
+        )
+        if self.debug == False:
+            shutil.rmtree(batchRoot)
+        return(True)

@@ -44,7 +44,8 @@ class eddyProAPI():
             'name':f"{siteID}_EddyPro",
             'biometData':None,
             'dynamicMetadata':None,
-            'userDefinedEddyProSettings':{}
+            'userDefinedEddyProSettings':{},
+            'priority':'normal'
             }
         # Apply defaults where not defined
         kwargs = defaultKwargs | kwargs
@@ -141,16 +142,13 @@ class preProcessing(eddyProAPI):
         self.Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
         
     def resetInventory(self):
-        RESET = input(f"WARNING!! You are about to complete a reset: type SOFT RESET to delete all contents of: {self.config['Paths']['meta_dir']}, type HARD RESET to delete all contents of: {self.config['Paths']['meta_dir']} **and** {self.config['Paths']['raw']}\n, provide any other input + enter to exit the application")
-        if RESET == 'SOFT RESET' or RESET == 'HARD RESET':
+        RESET = input(f"WARNING!! You are about to complete a reset: type RESET to continue, provide any other input + enter to exit the application")
+        if RESET.upper() == 'RESET':
             if os.path.isdir(self.config['Paths']['meta_dir']):
                 shutil.rmtree(self.config['Paths']['meta_dir'])
-                if RESET == 'HARD RESET' and os.path.isdir(self.config['Paths']['raw']):
-                    CONFIRM = input(F"WARNING!! You selected {RESET}, type CONFIRM to proceed, provide any other input + enter to exit the application")
-                    if CONFIRM == 'CONFIRM':
-                        shutil.rmtree(self.config['Paths']['raw'])
-                    else:
-                        sys.exit('Quitting')
+            if os.path.isdir(self.config['Paths']['raw']):
+                print(f"Deleting contents of : {self.config['Paths']['raw']}")
+                shutil.rmtree(self.config['Paths']['raw'])
         else:
             sys.exit('Quitting')
         # Re-create the directories if they doesn't exist
@@ -321,14 +319,18 @@ class preProcessing(eddyProAPI):
         self.fileInventory = self.fileInventory.join(groupLabels)
 
         # Add the file_prototype template to the configuration groups
+                
+        self.makeMetadataFiles()
+        self.filterData()
+        self.renameFiles()
         
         temp = self.fileInventory[list(groupLabels.columns)+['file_prototype']].groupby(list(groupLabels.columns)).agg(['first'])
         temp.columns = pd.MultiIndex.from_product([['Custom']]+temp.columns.levels)
         self.configurationGroups = self.configurationGroups.join(temp)
+        ptype = ('Custom','file_prototype','first')
+        self.configurationGroups.loc[self.configurationGroups[ptype].str.match(self.genericID)==False,
+                                     ptype] = self.config['stringTags']['exclude']
         
-        self.makeMetadataFiles()
-        self.filterData()
-        self.renameFiles()
         self.saveMetadataFiles()
 
     def makeMetadataFiles(self):
@@ -379,6 +381,7 @@ class preProcessing(eddyProAPI):
                 else:
                     col_num = ''
                 eddyProGroupDefs['Project'][key] = col_num
+
             file_prototype = self.fileInventory.loc[self.fileInventory['groupID']==groupID,'file_prototype'].values[0]
             eddyProCols = configparser.ConfigParser()
             eddyProCols.read_dict(eddyProGroupDefs)
@@ -409,13 +412,15 @@ class preProcessing(eddyProAPI):
                     h = groupRow.loc[pd.IndexSlice[['Custom'],headers,['first']]].values
                     # Get rows corresponding to groups
                     groupIX = (Data.loc[:,pd.IndexSlice[['group'],['ID']]]==groupID).max(axis=1).values
-                    # Apply the filter with an eval statement
                     for stat,filter in parameters['filters'].items():
                         variables = pd.IndexSlice[h,:,[stat]]
-                        test = eval(filter).max(axis=1)
-                        flag = test[test==True].index
-                        # Add a filter flag to exclude timestamps from EddyPro runs and list the corresponding exclusion condition
-                        self.fileInventory.loc[flag.values,'Filter Flags'] = (self.fileInventory.loc[flag.values,'Filter Flags'].str.replace(self.config['stringTags']['NaN'],'')+f',{name}: {condition}').str.lstrip(',')
+                        if self.config['stringTags']['NaN'] not in h:
+                            test = eval(filter).max(axis=1)
+                            flag = test[test==True].index
+                            # Add a filter flag to exclude timestamps from EddyPro runs and list the corresponding exclusion condition
+                            self.fileInventory.loc[flag.values,'Filter Flags'] = (self.fileInventory.loc[flag.values,'Filter Flags'].str.replace(self.config['stringTags']['NaN'],'')+f',{name}: {condition}').str.lstrip(',')
+                        else:
+                            self.fileInventory.loc[self.fileInventory['groupID']==groupID,'Filter Flags'] = (self.fileInventory.loc[self.fileInventory['groupID']==groupID,'Filter Flags'].str.replace(self.config['stringTags']['NaN'],'')+f',{name}: Data not available').str.lstrip(',')
 
     # File names are modified to facilitate EddyPro processing them by group
     def renameFiles(self):
@@ -436,6 +441,7 @@ class preProcessing(eddyProAPI):
             (self.fileInventory['filename'].str.match(self.genericID)==False)&
             (self.fileInventory['filename']!=self.config['stringTags']['NaN'])
             )].iterrows():
+            print(row)
             groupID = row['groupID']
             old_fn = row['filename']
             file_prototype = eval(self.config['stringTags']['groupID'])+row['file_prototype']
@@ -458,22 +464,54 @@ class runEP(eddyProAPI):
     def __init__(self,siteID,dateRange=None,**kwargs):#,template_file,siteID,name=None,testing=False,processes=os.cpu_count(),priority = 'normal'):
         super().__init__(siteID,dateRange,**kwargs)
         self.runList = []
+        runEddyPro = batchProcessing.runEddyPro(self.config['RootDirs']['EddyPro'],self.priority,self.debug)
         self.fileInventory = self.fileInventory.dropna()
-        for groupID,groupInfo in self.configurationGroups.iterrows():
+        if self.debug == False and os.path.isdir(os.getcwd()+'/temp/'):
+            shutil.rmtree(os.getcwd()+'/temp/')
+        ptype = ('Custom','file_prototype','first')
+        for groupID,groupInfo in self.configurationGroups.loc[self.configurationGroups[ptype]!=self.config['stringTags']['exclude']].iterrows():
 
             groupTimeStamps = self.fileInventory.loc[self.fileInventory['groupID'].astype('int')==groupID].index
             ix = pd.Series([i for i in range(groupTimeStamps.shape[0])])
-            bins = np.arange(0,self.processes+1)/self.processes
-            labels = np.arange(1,self.processes+1)
-            batches = pd.qcut(ix,q=bins,labels=labels)
+            if ix.shape[0]>self.processes:
+                bins = np.arange(0,self.processes+1)/self.processes
+                labels = np.arange(1,self.processes+1)
+                batches = pd.qcut(ix,q=bins,labels=labels)
+            else:
+                bins = np.arange(0,2)
+                labels = np.arange(1)
+                batches = pd.qcut(ix,q=bins,labels=labels)
+                
             for i in batches.unique():
                 batchStart = groupTimeStamps[batches==i].min()
                 batchEnd = groupTimeStamps[batches==i].max()+pd.Timedelta(minutes=int(groupInfo['Timing','file_duration','first']))
-                self.makeBatch(groupID,groupInfo,batchStart,batchEnd)
+                batchCount = groupTimeStamps[batches==i].shape[0]
+                self.makeBatch(groupID,groupInfo,batchStart,batchEnd,batchCount)
 
-    def makeBatch(self,groupID,groupInfo,batchStart,batchEnd):
+        if len(self.runList)>0: 
+            print(f'Initiating EddyPro Runs on {self.processes} cores at {self.priority} priority')
+            dout = []
+            if (__name__ == 'eddyProAPI' or __name__ == '__main__') and self.processes>1:
+                # run routine in parallel
+                pb = progressbar(len(self.runList),'')
+                with Pool(processes=self.processes) as pool:
+                    # max_chunksize=1
+                    # chunksize=min(int(np.ceil(len(self.runList)/self.processes)),max_chunksize)
+                    for out in pool.imap(runEddyPro.runBatch,self.runList,chunksize=1):
+                        pb.step()
+                        dout.append(out)
+                    pool.close()
+                    pb.close()
+            else:
+                # run routine sequentially for debugging
+                for i,toRun in enumerate(self.runList):
+                    out = runEddyPro.runBatch(toRun)
+                    dout.append(out)
+            print(dout)
+
+    def makeBatch(self,groupID,groupInfo,batchStart,batchEnd,batchCount):
         file_name = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['eddyProBatchRun'])
-        print(f'Creating {file_name}')
+        print(f'Creating {file_name} for {batchCount} files')
         proj_file = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['groupMetaData'])
         file_prototype = groupInfo['Custom','file_prototype','first']
         master_sonic = groupInfo['Instruments','instr_1_model','first']
