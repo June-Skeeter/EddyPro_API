@@ -26,10 +26,9 @@ def Batch(toRun):
     
     shutil.copy(bin+'processing_log.txt',toRun.replace('.eddypro','_log.txt'))
 
-
-    # log_file = toRun.replace('.eddypro','_log.txt')
-    # with open(log_file, 'w') as log:
-    #     log.write(p.stdout.decode('utf-8'))
-    #     log.write('\n')
-    #     log.write(p.stderr.decode('utf-8'))
+    log_file = toRun.replace('.eddypro','_log.txt')
+    with open(log_file, 'w') as log:
+        log.write(p.stdout.decode('utf-8'))
+        log.write('\n')
+        log.write(p.stderr.decode('utf-8'))
 

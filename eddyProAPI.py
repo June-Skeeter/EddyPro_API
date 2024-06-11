@@ -457,61 +457,62 @@ class preProcessing(eddyProAPI):
 class runEP(eddyProAPI):
     def __init__(self,siteID,dateRange=None,**kwargs):#,template_file,siteID,name=None,testing=False,processes=os.cpu_count(),priority = 'normal'):
         super().__init__(siteID,dateRange,**kwargs)
-
+        self.runList = []
         self.fileInventory = self.fileInventory.dropna()
-        # self.fileInventory = self.fileInventory.set_index(self.fileInventory['groupID'].astype('int'))
         for groupID,groupInfo in self.configurationGroups.iterrows():
-            file_name = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['eddyProRuns'])
-            print(f'Creating {file_name}')
-            proj_file = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['groupMetaData'])
-            file_prototype = groupInfo['Custom','file_prototype','first']
-            master_sonic = groupInfo['Instruments','instr_1_model','first']
-            if file_prototype.endswith('.ghg'):
-                file_type='0'
-            else:
-                file_type='1'
 
             groupTimeStamps = self.fileInventory.loc[self.fileInventory['groupID'].astype('int')==groupID].index
-            groupStart = max(groupTimeStamps.min(),self.dateRange[0])
-            groupEnd = min(groupTimeStamps.max(),self.dateRange[-1])+pd.Timedelta(minutes=int(groupInfo['Timing','file_duration','first']))
-            pr_start_date=str(groupStart.date())
-            pr_start_time=str(groupStart.time())[:5]
-            pr_end_date=str(groupEnd.date())
-            pr_end_time=str(groupEnd.time())[:5]
-                        
-            groupMetaData = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['groupMetaData'])
-            self.groupMetaData = configparser.ConfigParser()
-            self.groupMetaData.read(groupMetaData)
-            
-            eddyProCols =  self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['eddyProCols'])
-            eddyProCols = configparser.ConfigParser()
-            eddyProCols.read(eddyProCols)
+            ix = pd.Series([i for i in range(groupTimeStamps.shape[0])])
+            bins = np.arange(0,self.processes+1)/self.processes
+            labels = np.arange(1,self.processes+1)
+            batches = pd.qcut(ix,q=bins,labels=labels)
+            for i in batches.unique():
+                batchStart = groupTimeStamps[batches==i].min()
+                batchEnd = groupTimeStamps[batches==i].max()+pd.Timedelta(minutes=int(groupInfo['Timing','file_duration','first']))
+                self.makeBatch(groupID,groupInfo,batchStart,batchEnd)
+                
+    def makeBatch(self,groupID,groupInfo,batchStart,batchEnd):
+        file_name = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['eddyProBatchRun'])
+        print(f'Creating {file_name}')
+        proj_file = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['groupMetaData'])
+        file_prototype = groupInfo['Custom','file_prototype','first']
+        master_sonic = groupInfo['Instruments','instr_1_model','first']
+        if file_prototype.endswith('.ghg'):
+            file_type='0'
+        else:
+            file_type='1'
+        pr_start_date=str(batchStart.date())
+        pr_start_time=str(batchStart.time())[:5]
+        pr_end_date=str(batchEnd.date())
+        pr_end_time=str(batchEnd.time())[:5]
+                                
+        eddyProCols =  self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['eddyProCols'])
+        eddyProCols = configparser.ConfigParser()
+        eddyProCols.read(eddyProCols)
 
-            self.groupEddyProConfig = configparser.ConfigParser()
+        self.groupEddyProConfig = configparser.ConfigParser()
 
-            for section in self.eddyProStaticConfig.keys():
-                for option,value in self.eddyProStaticConfig[section].items():
-                    # if not self.groupEddyProConfig.has_option(section, option):
-                    if not self.groupEddyProConfig.has_section(section):
-                        self.groupEddyProConfig.add_section(section)
-                    self.groupEddyProConfig.set(section, option, value)
-                    if eddyProCols.has_section(section) and eddyProCols.has_option(section, option):
-                        self.groupEddyProConfig.set(section, option, eddyProCols[section][option])
+        for section in self.eddyProStaticConfig.keys():
+            for option,value in self.eddyProStaticConfig[section].items():
+                if not self.groupEddyProConfig.has_section(section):
+                    self.groupEddyProConfig.add_section(section)
+                self.groupEddyProConfig.set(section, option, value)
+                if eddyProCols.has_section(section) and eddyProCols.has_option(section, option):
+                    self.groupEddyProConfig.set(section, option, eddyProCols[section][option])
 
-                    # Use evaluate statement for dynamic settings
+                # Use evaluate statement for dynamic settings
+                if self.eddyProDynamicConfig.has_section(section) and self.eddyProDynamicConfig.has_option(section, option):    
+                    self.groupEddyProConfig.set(section, option, eval(self.eddyProDynamicConfig[section][option]))
 
-                    if self.eddyProDynamicConfig.has_section(section) and self.eddyProDynamicConfig.has_option(section, option):    
-                        # print(section, option, eval(self.eddyProDynamicConfig[section][option]))
-                        self.groupEddyProConfig.set(section, option, eval(self.eddyProDynamicConfig[section][option]))
+                # User supplied variables will overwrite any other settings
+                if section in self.userDefinedEddyProSettings.keys() and option in self.userDefinedEddyProSettings[section].keys():
+                    self.groupEddyProConfig.set(section, option,str(self.userDefinedEddyProSettings[section][option]))
 
-                    # User supplied variables will overwrite any other settings
-                    if section in self.userDefinedEddyProSettings.keys() and option in self.userDefinedEddyProSettings[section].keys():
-                        self.groupEddyProConfig.set(section, option,str(self.userDefinedEddyProSettings[section][option]))
-
-            # Save the run and append to the list of runs
-            with open(file_name, 'w') as eddypro:
-                eddypro.write(';EDDYPRO_PROCESSING\n')
-                self.groupEddyProConfig.write(eddypro,space_around_delimiters=False)
+        # Save the run and append to the list of runs
+        with open(file_name, 'w') as eddypro:
+            eddypro.write(';EDDYPRO_PROCESSING\n')
+            self.groupEddyProConfig.write(eddypro,space_around_delimiters=False)
+        self.runList.append(file_name)
                     
 
 # If called from command line ...

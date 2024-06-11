@@ -34,7 +34,7 @@ metadataFiles:
 groupFiles:
   groupMetaData: f"group_{groupID}_MetaData.metadata"
   eddyProCols: f"group_{groupID}_ColDefs.eddypro"
-  eddyProRuns: f"group_{groupID}.eddypro"
+  eddyProBatchRun: f"group_{groupID}_{batchStart.strftime(format='%Y%m%d%H%M')}_{batchEnd.strftime(format='%Y%m%d%H%M')}.eddypro"
 
   # biomet_file: Biomet.csv
   # raw_means: rawMeans.csv
