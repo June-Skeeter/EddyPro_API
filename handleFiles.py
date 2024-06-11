@@ -10,6 +10,7 @@ import zipfile
 import datetime
 import traceback
 import importlib
+import subprocess
 import numpy as np
 import pandas as pd
 import configparser
@@ -20,15 +21,20 @@ import xml.etree.ElementTree as ET
 from HelperFunctions import EventLog as eL
 importlib.reload(rLCF)
 
+
+def copyWithSubprocess(cmd):    
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+
 # Copy ghg or dat files and shift timestamp in file name if needed
 # useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
 # Called from preProcessing module, defined here to allow copying to be done in parallel
 # Compares against existing data to avoid re-copying files
 # if dateRange provided, will limit to files within the range
+
 def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True,checkList=[],dateRange=None):
     # return empty list if 
     empty = [None,None,None,None]
-    if inName.endswith(fileInfo['extension']) and fileInfo['searchTag'] in inName and inName not in checkList:
+    if inName.endswith(fileInfo['extension']) and fileInfo['searchTag'] in inName and inName not in checkList and fileInfo['excludeTag']+'_'+inName not in checkList:
         srch = re.search(fileInfo['search'], inName.rsplit('.',1)[0]).group(0)
         if srch is not None:
             file_prototype = inName.replace(srch,fileInfo['ep_date_pattern'])
@@ -46,15 +52,24 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
                     out_dir = f'{out_dir}{str(TIMESTAMP.month).zfill(2)}/'
             
             if dateRange is None or (TIMESTAMP >= dateRange.min() and TIMESTAMP <= dateRange.max()):
-                if os.path.isfile(f'{out_dir}/{outName}')==False:
+                source = os.path.abspath(f"{in_dir}/{inName}")
+                dest = os.path.abspath(f'{out_dir}/{outName}')
+                if os.path.isfile(dest)==False:
                     os.makedirs(out_dir, exist_ok=True)
-                    shutil.copy2(f"{in_dir}/{inName}",f"{out_dir}/{outName}")
-                return([TIMESTAMP,f"{in_dir}/{inName}",outName,file_prototype])
+                    cmd=None
+                    if sys.platform.startswith("darwin"): 
+                        cmd=['cp', source, dest]
+                    elif sys.platform.startswith("win"): 
+                        cmd=['copy', source, dest]
+                    if cmd:
+                        copyWithSubprocess(cmd)
+                return([TIMESTAMP,source,outName,file_prototype])
             else:return(empty)
         else:return(empty)
     # return the empty list if any condition failed
     return(empty)
-    
+
+
 class Parser():
     def __init__(self,config,metaDataTemplate=None):
         self.config = config
