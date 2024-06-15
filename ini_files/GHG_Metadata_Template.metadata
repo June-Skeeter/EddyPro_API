@@ -43,6 +43,9 @@ instr_*_manufacturer=
 instr_*_model=
 instr_*_sw_version=
 instr_*_id=
+instr_*_tube_length=
+instr_*_tube_diameter=
+instr_*_tube_flowrate=
 instr_*_height=
 instr_*_wformat=
 instr_*_wref=
@@ -53,6 +56,8 @@ instr_*_vertical_separation=
 instr_*_vpath_length=
 instr_*_hpath_length=
 instr_*_tau=
+instr_*_kw=
+instr_*_ko=
 
 [FileDescription]
 separator=

@@ -31,19 +31,21 @@ metadataFiles:
     index_col: [0]
     header: [0,1,2]
 
+rpOutputs:
+  fluxnet:
+    header: [0]
+    parse_dates: [0]
+    date_format: '%Y%m%d%H%M'
+    keep_date_col: True
+  biomet: 
+    header: [0,1]
+    parse_dates: [0,1]
+    date_format: '%Y-%m-%d %H:%M'
+    keep_date_col: True
+
 groupFiles:
   groupMetaData: f"group_{groupID}_MetaData.metadata"
   eddyProCols: f"group_{groupID}_ColDefs.eddypro"
-  eddyProBatchRun: f"group_{groupID}_{batchStart.strftime(format='%Y%m%d%H%M')}_{batchEnd.strftime(format='%Y%m%d%H%M')}.eddypro"
-
-  # biomet_file: Biomet.csv
-  # raw_means: rawMeans.csv
-  # dynamic_metadata: dynamicMetadata.csv
-  # site_setup: siteSetup.csv
-  # headers: Headers.csv
-  # calibration_parameters: calibrationsParameters.csv
-  # eddypro_rp: eddypro_rp.exe
-  # eddypro_fcc: eddypro_fcc.exe
 
 # Value for missing data in text columns
 # Idea is to use a non-default NaN value so that text columns are preserved where desired
@@ -53,8 +55,8 @@ stringTags:
   exclude: _Exclude_
   groupID: f"group_{groupID}_"
 
-templates:
-  variableList: ini_files/VariableNames.ini
+# templates:
+#   variableList: ini_files/VariableNames.ini
 
 delimiters:
   comma: ','

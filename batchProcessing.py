@@ -12,7 +12,6 @@ import subprocess
 import numpy as np
 import pandas as pd
 import configparser
-from pathlib import Path
 from io import TextIOWrapper
 import readLiConfigFiles as rLCF
 # import xml.etree.ElementTree as ET
@@ -20,12 +19,15 @@ import readLiConfigFiles as rLCF
 importlib.reload(rLCF)
 
 
-def copyWithSubprocess(source, dest):    
+def pasteWithSubprocess(source, dest, option = 'copy'):    
     cmd=None
     if sys.platform.startswith("darwin"): 
-        cmd=['cp', source, dest]
+        if option == 'copy':
+            cmd=['cp', source, dest]
+        elif option == 'move':
+            cmd=['mv',source,dest]
     elif sys.platform.startswith("win"): 
-        cmd=['copy', source, dest]
+        cmd=[option, source, dest]
     if cmd:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
@@ -60,7 +62,7 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
                 dest = os.path.abspath(f"{out_dir}/{outName}")
                 if os.path.isfile(dest)==False:
                     os.makedirs(out_dir, exist_ok=True)
-                    copyWithSubprocess(source, dest)
+                    pasteWithSubprocess(source, dest)
                 return([TIMESTAMP,source,outName,file_prototype])
             else:return(empty)
         else:return(empty)
@@ -162,46 +164,72 @@ class Parser():
 
 
 class runEddyPro():
-    def __init__(self,epRoot,priority = 'normal',debug=False):
+    def __init__(self,epRoot,subsetName='1',priority = 'normal',debug=False):
         self.epRoot = os.path.abspath(epRoot)
         self.priority = priority
         self.debug = debug
+        self.tempDir = os.path.abspath(f"{os.getcwd()}/temp/{subsetName}")
+        if self.debug == False and os.path.isdir(self.tempDir):
+            shutil.rmtree(self.tempDir)
+        os.makedirs(self.tempDir,exist_ok=True)
 
-    def runBatch(self,toRun):
+    def setUp(self,toRun):
+        fname = os.path.basename(toRun)
         toRun = os.path.abspath(toRun)
         cwd = os.getcwd()
         pid = os.getpid()
-        batchRoot = os.path.abspath(f'{cwd}/temp/{pid}')
+        batchRoot = os.path.abspath(f'{self.tempDir}/{pid}')
         try:
             shutil.rmtree(batchRoot)
         except:
             pass
         bin = os.path.abspath(f'{batchRoot}/bin/')
         os.makedirs(bin)        
-        copyWithSubprocess(self.epRoot, bin)
+        pasteWithSubprocess(self.epRoot, bin)
         ini = os.path.abspath(f'{batchRoot}/ini/')
         os.makedirs(ini)
         processing = os.path.abspath(f'{ini}/processing.eddypro')
-        print(toRun,processing)
-        copyWithSubprocess(toRun,processing)
+        pasteWithSubprocess(toRun,processing,option='move')
+        return(bin)
 
-        batchFile=os.path.abspath(f'{bin}/runEddyPro.bat')
-        with open(batchFile, 'w') as batch:
+    def rpRun(self,toRun):
+        bin = self.setUp(toRun)
+        runEddyPro_rp=os.path.abspath(f'{bin}/runEddyPro_rp.bat')
+        with open(runEddyPro_rp, 'w') as batch:
             contents = f'cd {bin}'
             P = self.priority.lower().replace(' ','')
-            contents+='\nSTART powershell  ".\\eddypro_rp.exe | tee processing_log.txt"'
+            contents+='\nSTART powershell  ".\\eddypro_rp.exe | tee rp_processing_log.txt"'
             contents+='\nping 127.0.0.1 -n 6 > nul'
             contents+=f'\nwmic process where name="eddypro_rp.exe" CALL setpriority "{self.priority}"'
             contents+='\nping 127.0.0.1 -n 6 > nul'
             contents+='\nEXIT'
             batch.write(contents)
 
-        subprocess.run(['cmd', '/c', batchFile], capture_output=True)
+        subprocess.run(['cmd', '/c', runEddyPro_rp], capture_output=True)
 
-        copyWithSubprocess(
-            os.path.abspath(f'{bin}/processing_log.txt'),
+        pasteWithSubprocess(
+            os.path.abspath(f'{bin}/rp_processing_log.txt'),
             os.path.abspath(toRun.replace('.eddypro','_log.txt'))
         )
-        if self.debug == False:
-            shutil.rmtree(batchRoot)
+            
         return(True)
+
+    def fccRun(self,toRun):
+        bin = self.setUp(toRun)
+        runEddyPro_fcc=os.path.abspath(f'{bin}/runEddyPro_fcc.bat')
+        with open(runEddyPro_fcc, 'w') as batch:
+            contents = f'cd {bin}'
+            P = self.priority.lower().replace(' ','')
+            contents+='\nSTART powershell  ".\\eddypro_fcc.exe | tee fcc_processing_log.txt"'
+            contents+='\nping 127.0.0.1 -n 6 > nul'
+            contents+=f'\nwmic process where name="eddypro_fcc.exe" CALL setpriority "{self.priority}"'
+            contents+='\nping 127.0.0.1 -n 6 > nul'
+            contents+='\nEXIT'
+            batch.write(contents)
+
+        subprocess.run(['cmd', '/c', runEddyPro_fcc], capture_output=True)
+
+        pasteWithSubprocess(
+            os.path.abspath(f'{bin}/fcc_processing_log.txt'),
+            os.path.abspath(toRun.replace('.eddypro','_log.txt'))
+        )
