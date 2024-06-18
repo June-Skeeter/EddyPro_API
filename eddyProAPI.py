@@ -29,9 +29,10 @@ dname = os.path.dirname(abspath)
 
 class eddyProAPI():
     os.chdir(dname)
-    def __init__(self,siteID,dateRange=None,**kwargs):
+    def __init__(self,siteID,**kwargs):
         # Default arguments
         defaultKwargs = {
+            'dateRange':None,
             'fileType':'ghg',
             'eddyProStaticConfig':'ini_files/LabStandard_Advanced.eddypro',
             'eddyProDynamicConfig':'ini_files/eddyProDynamicConfig.eddypro',
@@ -46,7 +47,10 @@ class eddyProAPI():
             'biometData':None,
             'dynamicMetadata':None,
             'userDefinedEddyProSettings':{},
-            'priority':'normal'
+            'priority':'normal',
+            'copyFrom':None,
+            'searchTag':'',
+            'timeShift':None
             }
         # Apply defaults where not defined
         kwargs = defaultKwargs | kwargs
@@ -59,8 +63,8 @@ class eddyProAPI():
             self.processes = 1
         
         self.siteID = siteID
-        if dateRange is not None:
-            self.dateRange = pd.DatetimeIndex(dateRange)
+        if self.dateRange is not None:
+            self.dateRange = pd.DatetimeIndex(self.dateRange)
         else:
             self.dateRange = pd.DatetimeIndex([date(datetime.now().year,1,1),datetime.now()])
         
@@ -137,10 +141,14 @@ class eddyProAPI():
                 setattr(self, key,pd.DataFrame())            
 
 class preProcessing(eddyProAPI):
-    def __init__(self,siteID,dateRange=None,**kwargs):
-        super().__init__(siteID,dateRange,**kwargs)
+    def __init__(self,siteID,**kwargs):
+        super().__init__(siteID,**kwargs)
         # Initiate parser class, defined externally to facilitate parallel processing
         self.Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
+        if self.debug == False:
+            self.searchRawDir()
+            self.readFiles()
+            self.groupAndFilter()
         
     def resetInventory(self):
         RESET = input(f"WARNING!! You are about to complete a reset: type RESET to continue, provide any other input + enter to exit the application")
@@ -156,19 +164,19 @@ class preProcessing(eddyProAPI):
         os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
         os.makedirs(self.config['Paths']['raw'],exist_ok=True)
 
-    def searchRawDir(self,copyFrom=None,searchTag='',timeShift=None):
+    def searchRawDir(self):
         # Build the file inventory of the "raw" directory and copy new files if needed
         # Option to shift the timestamp: copy data and rename using shifted timestamp
         # timeShift will only be applied to data copied from another directory
         search_dirs = [self.config['Paths']['raw']]
         shiftTime = [None]
-        if copyFrom is not None:
-            search_dirs.append(copyFrom)
-            shiftTime.append(timeShift)
+        if self.copyFrom is not None:
+            search_dirs.append(self.copyFrom)
+            shiftTime.append(self.timeShift)
 
         T1 = time.time()
         fileInfo = self.config[self.fileType]
-        fileInfo['searchTag'] = searchTag
+        fileInfo['searchTag'] = self.searchTag
         fileInfo['excludeTag'] = self.genericID
 
         # Walk the search directories
@@ -285,6 +293,7 @@ class preProcessing(eddyProAPI):
                    for v in fnmatch.filter(self.metaDataValues[key].columns,val)]  
         passer = [(key,v) 
                    for key,value in self.config['monitoringInstructions']['metaData']['pass'].items() 
+                   if key in self.metaDataValues.columns.get_level_values(0)
                    for val in value
                    for v in fnmatch.filter(self.metaDataValues[key].columns,val)]  
         self.metaDataValues[grouper] = self.metaDataValues[grouper].fillna(self.config['stringTags']['NaN'])
@@ -485,10 +494,10 @@ class preProcessing(eddyProAPI):
         self.configurationGroups.to_csv(self.config['configurationGroups'])
         
 class runEP(eddyProAPI):
-    def __init__(self,siteID,dateRange=None,**kwargs):
+    def __init__(self,siteID,**kwargs):
         if 'processes' not in kwargs:
             kwargs['processes']=int(os.cpu_count()/2)
-        super().__init__(siteID,dateRange,**kwargs)
+        super().__init__(siteID,**kwargs)
         
         self.tempDir = os.path.abspath(os.getcwd()+'/temp/')
         if self.debug == False and os.path.isdir(self.tempDir):
