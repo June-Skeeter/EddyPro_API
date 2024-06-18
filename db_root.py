@@ -5,15 +5,15 @@ import os
 import sys
 import yaml
 
-config_fn = '_config.yml'
+config_fn = 'config_files/path_definitions.yml'
 
-def get_config(fn='_config.yml'):
+def get_config(fn):
     with open(fn) as f:
         config = yaml.safe_load(f)
     return(config)
 
 
-# 1 Search for _config.yml in root of Project Folder
+# 1 Search for config_fn in root of Project Folder
 if os.path.isfile(config_fn):
     db_root = get_config(config_fn)
 
@@ -25,9 +25,9 @@ else:
         pth = pth[0]+'/'
         if os.path.isfile(pth+config_fn):
             config = get_config(pth+config_fn)
-# try:
-#     db_root = config['Database']['root']
-#     db_ini = db_root+'Calculation_Procedures/TraceAnalysis_ini/'
-#     db_hf = config['Highfreq']['root']
-# except:
-#     print('Not root configurations found')
+try:
+    db_root = config['Database']['root']
+    db_ini = db_root+'Calculation_Procedures/TraceAnalysis_ini/'
+    db_hf = config['Highfreq']['root']
+except:
+    print('No root configurations found')

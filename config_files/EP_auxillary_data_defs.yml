@@ -1,0 +1,60 @@
+
+# Make a copy of this template file and delete the "_template" from the name
+# Then define the requests accordingly
+# Each to level key is one request, that will output a csv with:
+#   * The corresponding traces 
+#   * For the specified stage
+#   * With the desired formatting
+# In this example:
+#   EP_biomet is one request; EP_dynamic_metadata is a separate request
+#   This template would produce two .csv files
+
+biometData:
+  formatting:
+    units_in_header: True
+    na_value: -9999
+    time_vectors: # Split (or don't) and format timestamp.  See EP_dynamic_metadata for example of split date & time columns
+      timestamp:
+        output_name: TIMESTAMP_1
+        fmt: '%Y-%m-%d %H%M'
+        units: yyyy-mm-dd HHMM
+  traces:
+    LW_IN_1_1_1:
+      units: W+1m-2
+      output_name: LWIN_1_1_1
+    PA_1_1_1:
+      units: kPa
+      output_name: Pa_1_1_1
+    PPFD_IN_1_1_1:
+      units: umol+1m-2s-1
+      output_name: PPFD_1_1_1
+    RH_1_1_1:
+      units: '%'
+      output_name: RH_1_1_1
+    SW_IN_1_1_1:
+      units: W+1m-2
+      output_name: Rg_1_1_1
+    TA_1_1_1:
+      units: degC
+      output_name: Ta_1_1_1
+
+dynamicMetadata:
+  traces:
+    canopy_height:
+      units: m
+      output_name: canopy_height
+  formatting:
+    resample: # Optional tag to apply downsampling, see https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.resample.html#pandas.DataFrame.resample
+      freq: D
+      agg: mean
+    units_in_header: False
+    na_value: # If left blank, drop nan data instead of setting specific value
+    time_vectors: # Split (or don't) and format timestamp.  See EP_dynamic_metadata for example of split date & time columns
+      date:
+        output_name: date
+        fmt: '%Y-%m-%d'
+        units: yyyy-mm-dd
+      time:
+        output_name: time
+        fmt: '%H:%M'
+        units: HH:MM

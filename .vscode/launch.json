@@ -1,0 +1,26 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--siteID", "BBS",
+                "--fileType", "dat",
+                "--metadataTemplate", "Y:/BBS/TOA5_BBS.FLUX_2023_06_14_1500.metadata",
+                "--Years", "2023",
+                "--Month", "6",
+                "--reset", "1",
+                "--copyFrom", "X:\\BBS\\EC_Station\\2023\\20230616",
+                "--copyTag", "BBS.FLUX",
+                "--timeShift", "30"
+            ]
+        }
+    ]
+}

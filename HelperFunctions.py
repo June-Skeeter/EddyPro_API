@@ -2,6 +2,18 @@ import sys
 import numpy as np
 import pandas as pd
 
+def instrumentSeparation(northOffset,u,v):
+    # for CSAT3
+    # northOffset is degrees from North
+    # u is distance along main axis of sonic (positive=behind)
+    # v is distance perpendicular to main axis (positive = right side as viewed from front)
+
+    # Convert to "math wind direction"
+    mwd = 270-northOffset
+    rad = mwd*np.pi/180
+    x = np.sin(rad)*u+np.sin(rad)*v
+    y = np.cos(rad)*u+np.cos(rad)*v
+    return(x,y)
 
 # substitute keys in a path with corresponding path_strings from a class object 
 # remove from the path if it doesn't exist
@@ -33,8 +45,9 @@ class progressbar():
         self.show(0)
 
     def show(self,j):
-        x = int(self.size*j/self.items)
-        print(f"{self.prefix}[{u'█'*x}{('.'*(self.size-x))}] {j}/{self.items}", end='\r', file=self.out, flush=True)
+        if self.items > 0:
+            x = int(self.size*j/self.items)
+            print(f"{self.prefix}[{u'█'*x}{('.'*(self.size-x))}] {j}/{self.items}", end='\r', file=self.out, flush=True)
 
     def step(self,step_size=1):
         self.i+=step_size
