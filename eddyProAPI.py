@@ -20,7 +20,7 @@ from functools import partial
 from collections import Counter, defaultdict
 from multiprocessing import Pool
 from datetime import datetime,date
-from HelperFunctions import progressbar
+from HelperFunctions import progressbar, queryBiometDatabase
 importlib.reload(batchProcessing)
 
 # Directory of current script
@@ -32,6 +32,7 @@ class eddyProAPI():
     def __init__(self,siteID,**kwargs):
         # Default arguments
         defaultKwargs = {
+            'sourceDir':None,
             'dateRange':None,
             'fileType':'ghg',
             'eddyProStaticConfig':'ini_files/LabStandard_Advanced.eddypro',
@@ -48,16 +49,16 @@ class eddyProAPI():
             'dynamicMetadata':None,
             'userDefinedEddyProSettings':{},
             'priority':'normal',
-            'copyFrom':None,
             'searchTag':'',
-            'timeShift':None
+            'timeShift':None,
+            'queryBiometDatabase':False
             }
         # Apply defaults where not defined
         kwargs = defaultKwargs | kwargs
         # add arguments as class attributes
         for k, v in kwargs.items():
             setattr(self, k, v)
-            
+
         # Turn of multiprocessing when debugging and limit number of files
         if self.debug == True:
             self.processes = 1
@@ -119,6 +120,19 @@ class eddyProAPI():
         os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
         os.makedirs(self.config['Paths']['raw'],exist_ok=True)
 
+        # On the fly Biomet and dynamicMetadata csv file generation
+        # For Biomet.Net users only
+        if self.queryBiometDatabase and os.path.isdir(self.config['BiometUser']['Biomet.Net']):
+            auxilaryDpaths=queryBiometDatabase(
+                siteID=siteID,
+                BiometPath = self.config['BiometUser']['Biomet.Net'],
+                Database = self.config['BiometUser']['Database'],
+                dateRange = self.dateRange,
+                stage='Second')
+            for key,value in auxilaryDpaths.items():
+                setattr(self, key, value)
+
+
         if self.biometData is not None:
             self.biometDataTable = pd.read_csv(self.biometData)
         
@@ -170,8 +184,8 @@ class preProcessing(eddyProAPI):
         # timeShift will only be applied to data copied from another directory
         search_dirs = [self.config['Paths']['raw']]
         shiftTime = [None]
-        if self.copyFrom is not None:
-            search_dirs.append(self.copyFrom)
+        if self.sourceDir is not None:
+            search_dirs.append(self.sourceDir)
             shiftTime.append(self.timeShift)
 
         T1 = time.time()
@@ -523,7 +537,7 @@ class runEP(eddyProAPI):
                 labels = np.arange(1)
                 batches = pd.qcut(ix,q=bins,labels=labels)
             if ix.shape[0]>0:
-                self.runEddyPro = batchProcessing.runEddyPro(self.config['RootDirs']['EddyPro'],groupID,self.priority,self.debug)
+                self.runEddyPro = batchProcessing.runEddyPro(self.config['Paths']['baseEddyPro'],groupID,self.priority,self.debug)
 
                 for id in batches.unique():
                     self.makeBatch(groupID,f"group_{groupID}_rp_{chr(ord('@')+id)}",
@@ -657,7 +671,7 @@ if __name__ == '__main__':
     
     CLI.add_argument("--metadataTemplate",nargs='+',type=str,default=[],)
 
-    CLI.add_argument("--copyFrom",nargs="?",type=str,default=None,)
+    CLI.add_argument("--sourceDir",nargs="?",type=str,default=None,)
 
     CLI.add_argument("--searchTag",nargs="?",type=str,default='',)
 
@@ -675,7 +689,7 @@ if __name__ == '__main__':
     args = CLI.parse_args()
 
     for siteID in args.siteID:
-        ra = read_ALL(siteID,fileType=args.fileType,metadataUpdates=args.metadataUpdates,copyFrom=args.copyFrom,searchTag=args.searchTag,timeShift=args.timeShift)
+        ra = read_ALL(siteID,fileType=args.fileType,metadataUpdates=args.metadataUpdates,sourceDir=args.sourceDir,searchTag=args.searchTag,timeShift=args.timeShift)
         for year in args.Years:
 
             for month in args.Month:

@@ -1,11 +1,19 @@
 # User defined root directories
 # !!This is a template file!!
 # To define your path(s)
-# Make a copy of this template file and delete the "_template" from the name
+# Make a copy of this template file and delete "_template" from the filename
 # Then define the paths accordingly
-RootDirs:
+rootDir:
+  # Path to your EddyPro installation, 
+  EddyPro: C:/Program Files/LI-COR/EddyPro-7.0.9/
+  # Path where all data files can be found
+  # Pre-processing module can copy raw data to this folder from another source if needed
+  # workingDir/SiteID/ will contain all:
+    # raw data, axulary data (Biomet & dynamicMetadata csv files), output files
+  workingDir: C:/temp/
+BiometUser:
+  # Optional for Biomet.Net database users
+  # Can be used for on the fly generation of Biomet.csv and dynamicMetadata.csv files
+  # Note this makes an external call to Biomet.Net
+  Biomet.Net: C:/Biomet.Net/
   Database: C:/Database/
-  Highfreq: C:/highfreq/
-  EddyPro: C:/Program Files/LI-COR/EddyPro-7.0.9/bin/
-  Outputs: C:/temp/
-  Datadump: X:/
