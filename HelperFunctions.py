@@ -8,7 +8,7 @@ def queryBiometDatabase(siteID,BiometPath,Database,dateRange,stage):
     wd = os.path.dirname(os.path.realpath(__file__))
     os.chdir(os.path.abspath(BiometPath+'/Python'))
     import csvFromBinary as cfb    
-    createAuxilaryData = os.path.abspath(wd+'/config_files/EP_auxillary_data_defs.yml')
+    createAuxilaryData = os.path.abspath(wd+'/config_files/BiometDataFileTemplate.yml')
     auxilaryDpaths=cfb.makeCSV(
         siteID,
         Database=Database,

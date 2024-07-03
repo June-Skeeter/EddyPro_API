@@ -7,17 +7,22 @@ format: pdf
 
 # Abstract
 
-An application program interface (API) was developed to streamline the processing of Eddy Covariance data in Eddy Pro&reg;.  The API allows users run EddyPro in parallel, high-priority batches to minimize computation times.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI.
+An application program interface (API) was developed to streamline the processing of Eddy Covariance (EC) data in Eddy Pro&reg;.  The API consists of two modules: the Pre-processing module allows users to filter raw EC data using quality controls, generate descriptive statistics for the raw data, and check for changes in metadata (e.g., instrument separation) and group the EC data into periods common configurations.  The Main module then takes the results of the pre-processing routine and uses them to run EddyPro in parallel batches, to minimize computation times.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI.  Furthermore, the API allows for automation of EC data processing while maintaining the ability to use the EddyPro GUI to define and inspect processing configurations.
 
 # Introduction
 
-Eddy Covariance (EC) is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses (e.g., CO_2).  Flux estimation via EC involves applying a Reynolds Operators to high frequency (>=10 Hz) measurements of scalar concentrations and 3D winds over 30- to 60-minute intervals.  This is a computationally expensive procedure, and when it must be repeated over months or years of data, it quickly becomes an incredibly time consuming procedure.
+Eddy Covariance (EC) is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses (e.g., CO_2).  Flux estimation via EC involves applying a Reynolds Operators to high frequency (>=10 Hz) measurements of 3-D winds and scalar concentrations over 30- to 60-minute intervals.  This is a computationally expensive procedure, and it can be particularly time consuming when repeated over months or years worth of EC data.
 
 One of the most popular applications for processing EC data is EddyPro&reg; @noauthor_eddypro_2021. The application is designed to provide easy, accurate EC flux computations @li-cor_inc_eddypro_2021.  It has a graphic user interface (GUI) that allows apply a standard processing pipeline or selectively apply more advanced filtering and correction procedures as needed.  The backend of the processing pipeline is executed in FORTRAN, and EddyPro outputs half-hourly or hourly flux estimates and other supplemental data as human-readable .csv files.
 
-While the EddyPro software application has made processing EC data more user friendly, it is still a tedious, and time consuming procedure.  The software processes files sequentially; it can take hours to execute when process multiple months worth of data or applying computationally expensive corrections (e.g., @ibrom_strong_2007; @fratini_relative_2012).  Eddy Covariance data should be processed in batches over time-periods with similar conditions (months or seasons) to allow sufficient data for spectral determining spectral corrections.  But when processing longer-time periods there substantial room for reduction of processing times via parallel computing.
+While the EddyPro software application has made processing EC data more user friendly, it is still a tedious, and time consuming procedure.  The user is required to manually initiate runs in the GUI and whenever data need to be processed.  This can leave considerable room for errors and divergence of processing procedures between sites and time periods when processing is conducted by multiple or inexperienced users in a research group (e.g., graduate students).  
 
-Manual processing of data produces considerable room for error and divergence of processing procedures between sites and time periods.  Particularly when processing is conducted by multiple or inexperienced users in a research group (e.g., graduate students).  Reprocessing is often required after 
+Reprocessing is often required either to correct mistakes or test out different calculation and correction procedures. However, the GUI processes files sequentially and it can take days to execute when processing multiple years worth of data for a single site.  When applying computationally expensive (e.g., @ibrom_strong_2007; @fratini_relative_2012) which are sensitive to changes in site metadata to long periods of data, the GIU can be prone to crashing with cryptic error messages.
+
+
+Eddy Covariance data should be processed in batches over time-periods with similar conditions (e.g., seasons) and common configurations (e.g., instrument separation).  To allow sufficient data for spectral determining spectral corrections.  But when processing longer-time periods there substantial room for reduction of processing times via parallel computing.
+
+
 
 
 The EddyPro API (Application Program Interface) is a python wrapper for the EddyPro software package that allows for automation and parallel processing of flux estimation procedures.  Processing procedures can be configured using the EddyPro GUI or a text editor then dynamically implemented via the API to set the run period(s) and batch the data for processing in parallel.  
