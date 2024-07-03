@@ -12,8 +12,8 @@ rootDir:
     # raw data, axulary data (Biomet & dynamicMetadata csv files), output files
   workingDir: C:/temp/
 BiometUser:
-  # Optional for Biomet.Net database users
+  # Optional for Biomet.net database users
   # Can be used for on the fly generation of Biomet.csv and dynamicMetadata.csv files
-  # Note this makes an external call to Biomet.Net
-  Biomet.Net: C:/Biomet.Net/
+  # Note this makes an external call to Biomet.net
+  Biomet.net: C:/Biomet.net/
   Database: C:/Database/

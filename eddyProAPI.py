@@ -53,6 +53,15 @@ class eddyProAPI():
             'timeShift':None,
             'queryBiometDatabase':False
             }
+        if isinstance(kwargs, dict):
+            pass
+        elif os.path.isdir(kwargs):
+            with open(kwargs) as yml:
+                kwargs = yaml.safe_load(yml)
+        else:
+            sys.exit(f"Provide a valid set of arguments, either from a yaml file or a dict")
+
+        
         # Apply defaults where not defined
         kwargs = defaultKwargs | kwargs
         # add arguments as class attributes
@@ -101,11 +110,6 @@ class eddyProAPI():
         else:
             sys.exit(f"Missing {'config_files/user_path_definitions.yml'}")
 
-        for f in ['monitoringInstructions','eddyProGroupDefs']:
-            if os.path.isfile(f'config_files/{f}.yml'):
-                with open(f'config_files/{f}.yml') as yml:
-                    self.config[f] = yaml.safe_load(yml)
-                    
         # Setup paths using definitions from config file
         self.config['Paths'] = {}
         for key,val in self.config['RelativePaths'].items():
@@ -121,11 +125,11 @@ class eddyProAPI():
         os.makedirs(self.config['Paths']['raw'],exist_ok=True)
 
         # On the fly Biomet and dynamicMetadata csv file generation
-        # For Biomet.Net users only
-        if self.queryBiometDatabase and os.path.isdir(self.config['BiometUser']['Biomet.Net']):
+        # For Biomet.net users only
+        if self.queryBiometDatabase and os.path.isdir(self.config['BiometUser']['Biomet.net']):
             auxilaryDpaths=queryBiometDatabase(
                 siteID=siteID,
-                BiometPath = self.config['BiometUser']['Biomet.Net'],
+                BiometPath = self.config['BiometUser']['Biomet.net'],
                 Database = self.config['BiometUser']['Database'],
                 dateRange = self.dateRange,
                 stage='Second')
@@ -136,9 +140,6 @@ class eddyProAPI():
         if self.biometData is not None:
             self.biometDataTable = pd.read_csv(self.biometData)
         
-        # Read the existing metadata from a previous run if they exist
-        if self.reset == True: self.resetInventory()
-
         # Read the existing metadata from a previous run if they exist
         read_files = {key:value for key,value in self.config['metadataFiles'].items() if value['filepath_or_buffer'].startswith('f"')==False}
         if sum([os.path.isfile(value['filepath_or_buffer']) for value in read_files.values()]) == len(read_files):
@@ -157,6 +158,10 @@ class eddyProAPI():
 class preProcessing(eddyProAPI):
     def __init__(self,siteID,**kwargs):
         super().__init__(siteID,**kwargs)
+        
+        # Read the existing metadata from a previous run if they exist
+        if self.reset == True: self.resetInventory()
+        
         # Initiate parser class, defined externally to facilitate parallel processing
         self.Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
         if self.debug == False:
