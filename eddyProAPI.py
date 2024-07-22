@@ -51,7 +51,8 @@ class eddyProAPI():
             'priority':'normal',
             'searchTag':'',
             'timeShift':None,
-            'queryBiometDatabase':False
+            'queryBiometDatabase':False,
+            'metadataUpdates':None,
             }
         if isinstance(kwargs, dict):
             pass
@@ -297,6 +298,15 @@ class preProcessing(eddyProAPI):
         self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
         self.metaDataValues.to_csv(self.config['metaDataValues'])
         print('Reading Complete, time elapsed: ',time.time()-T1)
+        if self.metadataUpdates is not None:
+            self.userMetadataUpdates() 
+    
+    def userMetadataUpdates(self):
+        
+        df = pd.read_csv(self.metadataUpdates)
+        df['TIMESTAMP_Start'] = pd.to_datetime(df['TIMESTAMP_Start'])
+        df['TIMESTAMP_End'] = pd.to_datetime(df['TIMESTAMP_End'])
+        
 
     def groupAndFilter(self):
         # As defined in monitoringInstructions, group timestamps by site configurations to define eddyPro Runs
