@@ -293,7 +293,7 @@ class preProcessing(eddyProAPI):
                     out = self.Parser.readFile((timestamp,file))
                     self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
                     self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
-                    print(f'{file} complete, time elapsed: ',time.time()-T2)
+                    print(f'{file} complete, time elapsed:git ',time.time()-T2)
         
         self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
         self.metaDataValues.to_csv(self.config['metaDataValues'])
@@ -306,7 +306,7 @@ class preProcessing(eddyProAPI):
         df = pd.read_csv(self.metadataUpdates)
         df['TIMESTAMP_Start'] = pd.to_datetime(df['TIMESTAMP_Start'])
         df['TIMESTAMP_End'] = pd.to_datetime(df['TIMESTAMP_End'])
-        
+
 
     def groupAndFilter(self):
         # As defined in monitoringInstructions, group timestamps by site configurations to define eddyPro Runs
