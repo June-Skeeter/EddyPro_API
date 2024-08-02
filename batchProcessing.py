@@ -30,7 +30,7 @@ def pasteWithSubprocess(source, dest, option = 'copy'):
         cmd=[option, source, dest]
     if cmd:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-
+    print(proc)
 # Copy ghg or dat files and shift timestamp in file name if needed
 # useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
 # Called from preProcessing module, defined here to allow copying to be done in parallel

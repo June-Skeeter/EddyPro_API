@@ -562,7 +562,8 @@ class runEP(eddyProAPI):
                 labels = np.arange(1)
                 batches = pd.qcut(ix,q=bins,labels=labels)
             if ix.shape[0]>0:
-                self.runEddyPro = batchProcessing.runEddyPro(self.config['Paths']['baseEddyPro'],groupID,self.priority,self.debug)
+                self.runEddyPro = batchProcessing.runEddyPro(self.config['Paths']['baseEddyPro'],
+                                f"group_{groupID}",self.priority,self.debug)
 
                 for id in batches.unique():
                     self.makeBatch(groupID,f"group_{groupID}_rp_{chr(ord('@')+id)}",
@@ -576,7 +577,6 @@ class runEP(eddyProAPI):
                                 groupTimeStamps.max()+pd.Timedelta(minutes=int(groupInfo['Timing','file_duration','first'])),
                                 groupTimeStamps.shape[0])
                 self.runGroup(groupID)
-        print('Remember to update project ID>//////>??????')
 
     def makeBatch(self,groupID,project_id,groupInfo,batchStart,batchEnd,batchCount):
         file_name = f"{self.tempDir}\{project_id}.eddypro"
@@ -683,9 +683,10 @@ class runEP(eddyProAPI):
         for toDel in subProcesIDs:
             print(toDel)
             shutil.rmtree(toDel)
-        runOut = self.config['Paths']['output_path']+'/'+datetime.strftime(datetime.now(),format='%Y%m%d%H%M')
-        os.makedirs(runOut)
-        batchProcessing.pasteWithSubprocess(f"{os.getcwd()}/temp/",runOut,option='mv')
+        d_out = os.path.abspath(self.config['Paths']['output_path'])
+        d_in = os.path.abspath(f"{os.getcwd()}/temp/")
+        batchProcessing.pasteWithSubprocess(d_in,d_out,option='move')
+        os.rename(os.path.abspath(d_out+'/temp'),os.path.abspath(d_out+'/'+datetime.strftime(datetime.now(),format='%Y%m%d%H%M')))
         
 
 # If called from command line ...

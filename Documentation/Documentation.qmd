@@ -2,12 +2,12 @@
 title: "An Application Program Interface for Automating and Streamlining Flux Processing in EddyPro&reg;"
 author: Dr. June Skeeter
 bibliography: EddyProAPI.bib
-format: pdf
+format: docx
 ---
 
 # Abstract
 
-An application program interface (API) was developed to streamline the processing of Eddy Covariance (EC) data in Eddy Pro&reg;.  The API consists of two modules: the Pre-processing module allows users to filter raw EC data using quality controls, generate descriptive statistics for the raw data, and check for changes in metadata (e.g., instrument separation) and group the EC data into periods common configurations.  The Main module then takes the results of the pre-processing routine and uses them to run EddyPro in parallel batches, to minimize computation times.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI.  Furthermore, the API allows for automation of EC data processing while maintaining the ability to use the EddyPro GUI to define and inspect processing configurations.
+Eddy Covariance (EC) is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses.  Processing raw EC data to calculate fluxes is computationally intensive, which poses a barrier for widespread dissemination of EC data products.  One of the most popular and accessible options for flux computation is EddyPro&reg;; a software application with graphic user interface (GUI) that allows users to process EC data and apply a variety of corrections depending on their needs.  Manually defining and exciting EddyPro&reg; runs limits the efficiency of flux processing and increases the risk of user error impacting flux estimates.  An application program interface (API) was developed to help standardize and expedite processing EC data in Eddy Pro&reg;.  The API consists of two modules: the pre-processing module filters raw EC data using quality controls, generates descriptive statistics for the raw data, checks for changes in metadata (e.g., instrument separation), and groups EC data into periods common configurations for processing.  The processing module then runs EddyPro&reg; based on a user-defined configuration, which can be setup using the EddyPro GUI or by modifying one of the configuration files included with the API.  The processing is executed parallel batches, to minimize computation times.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI.  The API allows for automation of EC data processing while maintaining the ability to use the EddyPro GUI to define and inspect processing configurations.
 
 # Introduction
 
