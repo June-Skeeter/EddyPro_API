@@ -69,7 +69,6 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
     # return the empty list if any condition failed
     return(empty)
 
-
 class Parser():
     def __init__(self,config,metaDataTemplate=None):
         self.config = config
@@ -162,7 +161,6 @@ class Parser():
         d_agg = d_agg.reorder_levels(['Timestamp',None]).unstack()
         return(d_agg,col_names)
 
-
 class runEddyPro():
     def __init__(self,epRoot,subsetName='1',priority = 'normal',debug=False):
         self.epRoot = os.path.abspath(epRoot)
@@ -211,8 +209,7 @@ class runEddyPro():
             os.path.abspath(f'{bin}/rp_processing_log.txt'),
             os.path.abspath(toRun.replace('.eddypro','_log.txt'))
         )
-            
-        return(True)
+        return(os.path.split(bin)[0])
 
     def fccRun(self,toRun):
         bin = self.setUp(toRun)
@@ -233,3 +230,4 @@ class runEddyPro():
             os.path.abspath(f'{bin}/fcc_processing_log.txt'),
             os.path.abspath(toRun.replace('.eddypro','_log.txt'))
         )
+        return(os.path.split(bin)[0])

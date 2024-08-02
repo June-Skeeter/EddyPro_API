@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 
-def queryBiometDatabase(siteID,BiometPath,Database,dateRange,stage):
+def queryBiometDatabase(siteID,outputPath,BiometPath,Database,dateRange,stage):
     # UBC Micromet users can use this to generate Biomet and daynamicMetadata on the fly
     wd = os.path.dirname(os.path.realpath(__file__))
     os.chdir(os.path.abspath(BiometPath+'/Python'))
@@ -11,6 +11,7 @@ def queryBiometDatabase(siteID,BiometPath,Database,dateRange,stage):
     createAuxilaryData = os.path.abspath(wd+'/config_files/BiometDataFileTemplate.yml')
     auxilaryDpaths=cfb.makeCSV(
         siteID,
+        outputPath=outputPath,
         Database=Database,
         tasks=createAuxilaryData,
         stage=stage,

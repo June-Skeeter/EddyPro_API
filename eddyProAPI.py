@@ -54,6 +54,7 @@ class eddyProAPI():
             'queryBiometDatabase':False,
             'metadataUpdates':None,
             }
+        
         if isinstance(kwargs, dict):
             pass
         elif os.path.isdir(kwargs):
@@ -119,8 +120,12 @@ class eddyProAPI():
                 os.makedirs(self.config['Paths'][key])
 
         for key in self.config['metadataFiles'].keys():
-            self.config[key] =self.config['Paths']['meta_dir']+key+'.csv'
+            self.config[key] = self.config['Paths']['meta_dir']+key+'.csv'
             self.config['metadataFiles'][key]['filepath_or_buffer'] = self.config[key]
+
+        # Read the existing metadata from a previous run if they exist
+        if self.reset == True: self.resetInventory()
+
         # Create the directories if they doesn't exist
         os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
         os.makedirs(self.config['Paths']['raw'],exist_ok=True)
@@ -130,6 +135,7 @@ class eddyProAPI():
         if self.queryBiometDatabase and os.path.isdir(self.config['BiometUser']['Biomet.net']):
             auxilaryDpaths=queryBiometDatabase(
                 siteID=siteID,
+                outputPath = self.config['Paths']['meta_dir'],
                 BiometPath = self.config['BiometUser']['Biomet.net'],
                 Database = self.config['BiometUser']['Database'],
                 dateRange = self.dateRange,
@@ -156,13 +162,26 @@ class eddyProAPI():
             for key in read_files.keys():
                 setattr(self, key,pd.DataFrame())            
 
+    def resetInventory(self):
+        RESET = input(f"WARNING!! You are about to complete a reset: type RESET to continue, provide any other input + enter to exit the application")
+        if RESET.upper() == 'RESET':
+            if os.path.isdir(self.config['Paths']['meta_dir']):
+                print(f"Deleting contents of : {self.config['Paths']['meta_dir']}")
+                shutil.rmtree(self.config['Paths']['meta_dir'])
+            if os.path.isdir(self.config['Paths']['raw']):
+                print(f"Deleting contents of : {self.config['Paths']['raw']}")
+                shutil.rmtree(self.config['Paths']['raw'])
+        else:
+            sys.exit('Quitting')
+        # # Re-create the directories if they doesn't exist
+        # os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
+        # os.makedirs(self.config['Paths']['raw'],exist_ok=True)
+
+
 class preProcessing(eddyProAPI):
     def __init__(self,siteID,**kwargs):
         super().__init__(siteID,**kwargs)
-        
-        # Read the existing metadata from a previous run if they exist
-        if self.reset == True: self.resetInventory()
-        
+                
         # Initiate parser class, defined externally to facilitate parallel processing
         self.Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
         if self.debug == False:
@@ -170,20 +189,6 @@ class preProcessing(eddyProAPI):
             self.readFiles()
             self.groupAndFilter()
         
-    def resetInventory(self):
-        RESET = input(f"WARNING!! You are about to complete a reset: type RESET to continue, provide any other input + enter to exit the application")
-        if RESET.upper() == 'RESET':
-            if os.path.isdir(self.config['Paths']['meta_dir']):
-                shutil.rmtree(self.config['Paths']['meta_dir'])
-            if os.path.isdir(self.config['Paths']['raw']):
-                print(f"Deleting contents of : {self.config['Paths']['raw']}")
-                shutil.rmtree(self.config['Paths']['raw'])
-        else:
-            sys.exit('Quitting')
-        # Re-create the directories if they doesn't exist
-        os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
-        os.makedirs(self.config['Paths']['raw'],exist_ok=True)
-
     def searchRawDir(self):
         # Build the file inventory of the "raw" directory and copy new files if needed
         # Option to shift the timestamp: copy data and rename using shifted timestamp
@@ -302,11 +307,15 @@ class preProcessing(eddyProAPI):
             self.userMetadataUpdates() 
     
     def userMetadataUpdates(self):
-        
-        df = pd.read_csv(self.metadataUpdates)
-        df['TIMESTAMP_Start'] = pd.to_datetime(df['TIMESTAMP_Start'])
-        df['TIMESTAMP_End'] = pd.to_datetime(df['TIMESTAMP_End'])
-
+        df = pd.read_csv(self.metadataUpdates,header=[0,1])
+        df[('TIMESTAMP','Start')] = pd.to_datetime(df[('TIMESTAMP','Start')])
+        df[('TIMESTAMP','End')] = pd.to_datetime(df[('TIMESTAMP','End')])
+        df[('TIMESTAMP','End')] = df[('TIMESTAMP','End')].fillna(self.metaDataValues.index.max())
+        for i,row in df.iterrows():
+            for col in row.index:
+                if col[0] !=  'TIMESTAMP' and pd.isnull(row[col])==False:
+                    self.metaDataValues.loc[((self.metaDataValues.index>=row[('TIMESTAMP','Start')]) &
+                                            (self.metaDataValues.index<=row[('TIMESTAMP','End')])),col] = str(row[col])
 
     def groupAndFilter(self):
         # As defined in monitoringInstructions, group timestamps by site configurations to define eddyPro Runs
@@ -524,6 +533,7 @@ class preProcessing(eddyProAPI):
         
 class runEP(eddyProAPI):
     def __init__(self,siteID,**kwargs):
+        kwargs['reset'] = False
         if 'processes' not in kwargs:
             kwargs['processes']=int(os.cpu_count()/2)
         super().__init__(siteID,**kwargs)
@@ -633,7 +643,7 @@ class runEP(eddyProAPI):
                     
     def runGroup(self,groupID):
         print(f'Initiating EddyPro Runs for group {groupID} on {self.processes} cores at {self.priority} priority')
-        fpToRun = []
+        subProcesIDs = []
         print(self.rpList)
         if (__name__ == 'eddyProAPI' or __name__ == '__main__') and self.processes>1:
             # run routine in parallel
@@ -641,21 +651,21 @@ class runEP(eddyProAPI):
             with Pool(processes=self.processes) as pool:
                 for out in pool.imap(self.runEddyPro.rpRun,self.rpList,chunksize=1):
                     pb.step()
-                    fpToRun.append(out)
+                    subProcesIDs.append(out)
                 pool.close()
                 pb.close()
         else:
             # run routine sequentially for debugging
             for i,toRun in enumerate(self.rpList):
                 out = self.runEddyPro.rpRun(toRun)
-                fpToRun.append(out)
+                subProcesIDs.append(out)
         self.rpMerge()
-        self.runEddyPro.fccRun(self.fccFile)
+        subProcesIDs.append(self.runEddyPro.fccRun(self.fccFile))
+        self.copyFinalOutputs(subProcesIDs)
     
     def rpMerge(self):
         for filePattern,kwargs in self.config['rpOutputs'].items():
             search_path = os.path.abspath(f"{self.runEddyPro.tempDir}/**{filePattern}**.csv")
-
             toMerge = glob(search_path)
             Temp = pd.DataFrame()
             if 'parse_dates' in kwargs:
@@ -667,6 +677,16 @@ class runEP(eddyProAPI):
             Temp = Temp.set_index(list(kwargs['parse_dates'].keys())[0]).sort_index()
             Temp = Temp.sort_index()
             Temp.to_csv(self.ex_file.replace('fluxnet',filePattern),index=False)
+
+    def copyFinalOutputs(self,subProcesIDs):
+        print(subProcesIDs)
+        for toDel in subProcesIDs:
+            print(toDel)
+            shutil.rmtree(toDel)
+        runOut = self.config['Paths']['output_path']+'/'+datetime.strftime(datetime.now(),format='%Y%m%d%H%M')
+        os.makedirs(runOut)
+        batchProcessing.pasteWithSubprocess(f"{os.getcwd()}/temp/",runOut,option='mv')
+        
 
 # If called from command line ...
 if __name__ == '__main__':
