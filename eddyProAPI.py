@@ -6,6 +6,7 @@ import re
 import sys
 import yaml
 import time
+import json
 import shutil
 import fnmatch
 import argparse
@@ -26,35 +27,38 @@ importlib.reload(batchProcessing)
 # Directory of current script
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
+# Set to cwd to location of the current script
+os.chdir(dname)
+
+# Default arguments
+defaultArgs = {
+    'siteID':'SomeSite',
+    'sourceDir':'',
+    'dateRange':[date(datetime.now().year,1,1).strftime("%Y-%m-%d"),datetime.now().strftime("%Y-%m-%d")],
+    'fileType':'ghg',
+    'eddyProStaticConfig':'ini_files/LabStandard_Advanced.eddypro',
+    'eddyProDynamicConfig':'ini_files/eddyProDynamicConfig.eddypro',
+    'GHG_Metadata_Template':'ini_files/GHG_Metadata_Template.metadata',
+    'metaDataTemplate':'None',
+    'processes':os.cpu_count()-1,
+    'priority':'normal',
+    'debug':False,
+    'testSet':0,
+    'reset':False,
+    'name':'TestRun',
+    'biometData':'None',
+    'dynamicMetadata':'None',
+    'userDefinedEddyProSettings':{},
+    'priority':'normal',
+    'searchTag':'',
+    'timeShift':'None',
+    'biometUser':False,
+    'metaDataUpdates':'None',
+    }
 
 class eddyProAPI():
     os.chdir(dname)
-    def __init__(self,siteID,**kwargs):
-        # Default arguments
-        defaultKwargs = {
-            'sourceDir':None,
-            'dateRange':None,
-            'fileType':'ghg',
-            'eddyProStaticConfig':'ini_files/LabStandard_Advanced.eddypro',
-            'eddyProDynamicConfig':'ini_files/eddyProDynamicConfig.eddypro',
-            'GHG_Metadata_Template':'ini_files/GHG_Metadata_Template.metadata',
-            'metaDataTemplate':None,
-            'processes':os.cpu_count()-1,
-            'priority':'normal',
-            'debug':False,
-            'testSet':0,
-            'reset':False,
-            'name':f"{siteID}",
-            'biometData':None,
-            'dynamicMetadata':None,
-            'userDefinedEddyProSettings':{},
-            'priority':'normal',
-            'searchTag':'',
-            'timeShift':None,
-            'queryBiometDatabase':False,
-            'dumpToBiometDatabase':False,
-            'metadataUpdates':None,
-            }
+    def __init__(self,**kwargs):
         
         if isinstance(kwargs, dict):
             pass
@@ -64,9 +68,8 @@ class eddyProAPI():
         else:
             sys.exit(f"Provide a valid set of arguments, either from a yaml file or a dict")
 
-        
         # Apply defaults where not defined
-        kwargs = defaultKwargs | kwargs
+        kwargs = defaultArgs | kwargs
         # add arguments as class attributes
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -75,11 +78,7 @@ class eddyProAPI():
         if self.debug == True:
             self.processes = 1
         
-        self.siteID = siteID
-        if self.dateRange is not None:
-            self.dateRange = pd.DatetimeIndex(self.dateRange)
-        else:
-            self.dateRange = pd.DatetimeIndex([date(datetime.now().year,1,1),datetime.now()])
+        self.dateRange = pd.DatetimeIndex(self.dateRange)
         
         start_str = self.dateRange[0].strftime('%Y%m%d%H%M')
         end_str = self.dateRange[-1].strftime('%Y%m%d%H%M')
@@ -103,7 +102,7 @@ class eddyProAPI():
         # Read yaml configurations        
         with open('config_files/config.yml') as yml:
             self.config = yaml.safe_load(yml)
-        self.config['siteID'] = siteID
+        self.config['siteID'] = self.siteID
         groupID = '\d+'
         self.genericID = eval(self.config['stringTags']['groupID'])
         # Exit if user paths are not provided
@@ -133,9 +132,9 @@ class eddyProAPI():
 
         # On the fly Biomet and dynamicMetadata csv file generation
         # For Biomet.net users only
-        if self.queryBiometDatabase and os.path.isdir(self.config['BiometUser']['Biomet.net']):
+        if self.biometUser and os.path.isdir(self.config['BiometUser']['Biomet.net']):
             auxilaryDpaths=queryBiometDatabase(
-                siteID=siteID,
+                siteID=self.siteID,
                 outputPath = self.config['Paths']['meta_dir'],
                 biometPath = self.config['BiometUser']['Biomet.net'],
                 database = self.config['BiometUser']['Database'],
@@ -144,8 +143,7 @@ class eddyProAPI():
             for key,value in auxilaryDpaths.items():
                 setattr(self, key, value)
 
-
-        if self.biometData is not None:
+        if self.biometData != 'None':
             self.biometDataTable = pd.read_csv(self.biometData)
         
         # Read the existing metadata from a previous run if they exist
@@ -179,8 +177,8 @@ class eddyProAPI():
         # os.makedirs(self.config['Paths']['raw'],exist_ok=True)
 
 class preProcessing(eddyProAPI):
-    def __init__(self,siteID,**kwargs):
-        super().__init__(siteID,**kwargs)
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
                 
         # Initiate parser class, defined externally to facilitate parallel processing
         self.Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
@@ -194,8 +192,8 @@ class preProcessing(eddyProAPI):
         # Option to shift the timestamp: copy data and rename using shifted timestamp
         # timeShift will only be applied to data copied from another directory
         search_dirs = [self.config['Paths']['raw']]
-        shiftTime = [None]
-        if self.sourceDir is not None:
+        shiftTime = ['None']
+        if os.path.isdir(self.sourceDir):
             search_dirs.append(self.sourceDir)
             shiftTime.append(self.timeShift)
 
@@ -303,11 +301,11 @@ class preProcessing(eddyProAPI):
         self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
         self.metaDataValues.to_csv(self.config['metaDataValues'])
         print('Reading Complete, time elapsed: ',time.time()-T1)
-        if self.metadataUpdates is not None:
-            self.userMetadataUpdates() 
+        if self.metaDataUpdates != 'None':
+            self.usermetaDataUpdates() 
     
-    def userMetadataUpdates(self):
-        df = pd.read_csv(self.metadataUpdates,header=[0,1])
+    def usermetaDataUpdates(self):
+        df = pd.read_csv(self.metaDataUpdates,header=[0,1])
         df[('TIMESTAMP','Start')] = pd.to_datetime(df[('TIMESTAMP','Start')])
         df[('TIMESTAMP','End')] = pd.to_datetime(df[('TIMESTAMP','End')])
         df[('TIMESTAMP','End')] = df[('TIMESTAMP','End')].fillna(self.metaDataValues.index.max())
@@ -387,7 +385,7 @@ class preProcessing(eddyProAPI):
           
         eddyProGroupDefsTemplate={'Project':{}} 
         bm = 'RawProcess_BiometMeasurements'
-        if self.biometData is not None: 
+        if self.biometData != 'None': 
             eddyProGroupDefsTemplate[bm] = {}
             for key,value in self.config['eddyProGroupDefs'][bm].items():
                 if value in self.biometDataTable.columns:
@@ -532,11 +530,11 @@ class preProcessing(eddyProAPI):
         self.configurationGroups.to_csv(self.config['configurationGroups'])
         
 class runEP(eddyProAPI):
-    def __init__(self,siteID,**kwargs):
+    def __init__(self,**kwargs):
         kwargs['reset'] = False
         if 'processes' not in kwargs:
             kwargs['processes']=int(os.cpu_count()/2)
-        super().__init__(siteID,**kwargs)
+        super().__init__(**kwargs)
         
         self.tempDir = os.path.abspath(os.getcwd()+'/temp/')
         if self.debug == False and os.path.isdir(self.tempDir):
@@ -688,61 +686,81 @@ class runEP(eddyProAPI):
         d_in = os.path.abspath(f"{os.getcwd()}/temp/")
         batchProcessing.pasteWithSubprocess(d_in,d_out,option='move')
         os.rename(os.path.abspath(d_out+'/temp'),d_out_rn)
-        if self.dumpToBiometDatabase and os.path.isdir(self.config['BiometUser']['Biomet.net']):
+        if self.biometUser and os.path.isdir(self.config['BiometUser']['Biomet.net']):
             for outFile,metaData in self.config['fccFinalOutputs'].items():
                 toDump = fnmatch.filter(os.listdir(d_out_rn),f'*{outFile}*')
                 for td in toDump:
                     dumpToBiometDatabase(siteID=self.siteID,
                                         biometPath = self.config['BiometUser']['Biomet.net'],
                                         database = self.config['BiometUser']['Database'],
-                                        inputFile=td,
+                                        inputFile=f"{d_out_rn}/{td}",
                                         metaData=metaData,
                                         stage='epAutoRun',
-                                        tag='test')
+                                        tag=self.name)
             
 
 # If called from command line ...
 if __name__ == '__main__':
-    
-    # Set to cwd to location of the current script
-    Home_Dir = os.path.dirname(sys.argv[0])
-    os.chdir(Home_Dir)
 
     # Parse the arguments
     CLI=argparse.ArgumentParser()
 
-    CLI.add_argument("--siteID",nargs='+',type=str,default=[],)
-    
-    CLI.add_argument("--fileType",nargs="?",type=str,default="ghg",)
-
-    CLI.add_argument("--metadataUpdates",nargs="?",type=str,default=None,)
-    
-    CLI.add_argument("--metadataTemplate",nargs='+',type=str,default=[],)
-
-    CLI.add_argument("--sourceDir",nargs="?",type=str,default=None,)
-
-    CLI.add_argument("--searchTag",nargs="?",type=str,default='',)
-
-    CLI.add_argument("--timeShift",nargs="?",type=int,default=None,)
-  
-    CLI.add_argument("--reset",nargs="?",type=int,default=0,)
-
-    CLI.add_argument("--Years",nargs='+',type=int,default=[datetime.now().year],)
-
-    CLI.add_argument("--Month",nargs='+',type=int,default=[i+1 for i in range(12)],)
-    
-    CLI.add_argument("--Processes",nargs="?",type=int,default=os.cpu_count(),)
+    dictArgs = []
+    for key,val in defaultArgs.items():
+        dt = type(val)
+        nargs = "?"
+        if dt == type({}):
+            dictArgs.append(key)
+            dt = type('')
+            val = '{}'
+        elif dt == type([]):
+            nargs = '+'
+            dt = type('')
+        CLI.add_argument(f"--{key}",nargs=nargs,type=dt,default=val)
 
     # parse the command line
     args = CLI.parse_args()
 
-    for siteID in args.siteID:
-        ra = read_ALL(siteID,fileType=args.fileType,metadataUpdates=args.metadataUpdates,sourceDir=args.sourceDir,searchTag=args.searchTag,timeShift=args.timeShift)
-        for year in args.Years:
+    kwargs = vars(args)
+    for d in dictArgs:
+        kwargs[d] = json.loads(kwargs[d])
+    preProcessing(**kwargs)
 
-            for month in args.Month:
-                print(f'Processing: {siteID} {year}/{month}')
-                t1 = time.time()
-                ra.find_files(year,month,args.Processes)
-                print(f'Completed in: {np.round(time.time()-t1,4)} seconds')
+    # # Parse the arguments
+    # CLI=argparse.ArgumentParser()
+
+    # CLI.add_argument("--siteID",nargs='+',type=str,default=[],)
+    
+    # CLI.add_argument("--fileType",nargs="?",type=str,default="ghg",)
+
+    # CLI.add_argument("--metaDataUpdates",nargs="?",type=str,default=None,)
+    
+    # CLI.add_argument("--metadataTemplate",nargs='+',type=str,default=[],)
+
+    # CLI.add_argument("--sourceDir",nargs="?",type=str,default=None,)
+
+    # CLI.add_argument("--searchTag",nargs="?",type=str,default='',)
+
+    # CLI.add_argument("--timeShift",nargs="?",type=int,default=None,)
+  
+    # CLI.add_argument("--reset",nargs="?",type=int,default=0,)
+
+    # CLI.add_argument("--Years",nargs='+',type=int,default=[datetime.now().year],)
+
+    # CLI.add_argument("--Month",nargs='+',type=int,default=[i+1 for i in range(12)],)
+    
+    # CLI.add_argument("--Processes",nargs="?",type=int,default=os.cpu_count(),)
+
+    # # parse the command line
+    # args = CLI.parse_args()
+
+    # for siteID in args.siteID:
+    #     ra = read_ALL(siteID,fileType=args.fileType,metaDataUpdates=args.metaDataUpdates,sourceDir=args.sourceDir,searchTag=args.searchTag,timeShift=args.timeShift)
+    #     for year in args.Years:
+
+    #         for month in args.Month:
+    #             print(f'Processing: {siteID} {year}/{month}')
+    #             t1 = time.time()
+    #             ra.find_files(year,month,args.Processes)
+    #             print(f'Completed in: {np.round(time.time()-t1,4)} seconds')
 

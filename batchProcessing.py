@@ -45,7 +45,7 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
         if srch is not None:
             file_prototype = inName.replace(srch,fileInfo['ep_date_pattern'])
             TIMESTAMP =  datetime.datetime.strptime(srch,fileInfo['format'])
-            if fileInfo['timeShift'] is not None:
+            if fileInfo['timeShift'] != 'None':
                 TIMESTAMP = TIMESTAMP+datetime.timedelta(minutes=fileInfo['timeShift'])
                 timeString = datetime.datetime.strftime(TIMESTAMP,fileInfo['format'])
                 outName = inName.replace(srch,timeString)
@@ -70,11 +70,11 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
     return(empty)
 
 class Parser():
-    def __init__(self,config,metaDataTemplate=None):
+    def __init__(self,config,metaDataTemplate='None'):
         self.config = config
         # Define statistics to aggregate raw data by, see configuration
         self.agg = [key for key, value in self.config['monitoringInstructions']['dataAggregation'].items() if value is True]
-        if metaDataTemplate is not None:
+        if metaDataTemplate != 'None':
             self.metaDataTemplate,self.fileDescription = self.readMetaData(open(metaDataTemplate))
             self.fileDescription.update(self.config['dat'])
 
