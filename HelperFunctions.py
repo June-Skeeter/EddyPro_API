@@ -3,21 +3,35 @@ import os
 import numpy as np
 import pandas as pd
 
-def queryBiometDatabase(siteID,outputPath,BiometPath,Database,dateRange,stage):
+def queryBiometDatabase(siteID,outputPath,biometPath,database,dateRange,stage):
     # UBC Micromet users can use this to generate Biomet and daynamicMetadata on the fly
     wd = os.path.dirname(os.path.realpath(__file__))
-    os.chdir(os.path.abspath(BiometPath+'/Python'))
+    os.chdir(os.path.abspath(biometPath+'/Python'))
     import csvFromBinary as cfb    
     createAuxilaryData = os.path.abspath(wd+'/config_files/BiometDataFileTemplate.yml')
     auxilaryDpaths=cfb.makeCSV(
         siteID,
         outputPath=outputPath,
-        Database=Database,
+        database=database,
         tasks=createAuxilaryData,
         stage=stage,
         dateRange=dateRange)
     os.chdir(wd)
     return(auxilaryDpaths)
+
+def dumpToBiometDatabase(siteID,biometPath,database,inputFile,metaData,stage,tag=''):
+    wd = os.path.dirname(os.path.realpath(__file__))
+    os.chdir(os.path.abspath(biometPath+'/Python'))
+    import binaryFromText as bft
+    bft.writeTraces(siteID,
+                    inputFile,
+                    metaData,
+                    database=database,
+                    excludeCols=['bad*','x_??%','none*'],
+                    mode='repfill',
+                    stage=stage,
+                    tag=tag)
+    os.chdir(wd)
 
 
 def instrumentSeparation(northOffset,u,v):

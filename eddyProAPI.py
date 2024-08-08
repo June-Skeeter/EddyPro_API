@@ -20,7 +20,7 @@ from functools import partial
 from collections import Counter, defaultdict
 from multiprocessing import Pool
 from datetime import datetime,date
-from HelperFunctions import progressbar, queryBiometDatabase
+from HelperFunctions import progressbar, queryBiometDatabase,dumpToBiometDatabase
 importlib.reload(batchProcessing)
 
 # Directory of current script
@@ -52,6 +52,7 @@ class eddyProAPI():
             'searchTag':'',
             'timeShift':None,
             'queryBiometDatabase':False,
+            'dumpToBiometDatabase':False,
             'metadataUpdates':None,
             }
         
@@ -136,8 +137,8 @@ class eddyProAPI():
             auxilaryDpaths=queryBiometDatabase(
                 siteID=siteID,
                 outputPath = self.config['Paths']['meta_dir'],
-                BiometPath = self.config['BiometUser']['Biomet.net'],
-                Database = self.config['BiometUser']['Database'],
+                biometPath = self.config['BiometUser']['Biomet.net'],
+                database = self.config['BiometUser']['Database'],
                 dateRange = self.dateRange,
                 stage='Second')
             for key,value in auxilaryDpaths.items():
@@ -176,7 +177,6 @@ class eddyProAPI():
         # # Re-create the directories if they doesn't exist
         # os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
         # os.makedirs(self.config['Paths']['raw'],exist_ok=True)
-
 
 class preProcessing(eddyProAPI):
     def __init__(self,siteID,**kwargs):
@@ -664,7 +664,7 @@ class runEP(eddyProAPI):
         self.copyFinalOutputs(subProcesIDs)
     
     def rpMerge(self):
-        for filePattern,kwargs in self.config['rpOutputs'].items():
+        for filePattern,kwargs in self.config['rpIntermediary'].items():
             search_path = os.path.abspath(f"{self.runEddyPro.tempDir}/**{filePattern}**.csv")
             toMerge = glob(search_path)
             Temp = pd.DataFrame()
@@ -684,10 +684,22 @@ class runEP(eddyProAPI):
             print(toDel)
             shutil.rmtree(toDel)
         d_out = os.path.abspath(self.config['Paths']['output_path'])
+        d_out_rn = os.path.abspath(d_out+'/'+datetime.strftime(datetime.now(),format='%Y%m%d%H%M'))
         d_in = os.path.abspath(f"{os.getcwd()}/temp/")
         batchProcessing.pasteWithSubprocess(d_in,d_out,option='move')
-        os.rename(os.path.abspath(d_out+'/temp'),os.path.abspath(d_out+'/'+datetime.strftime(datetime.now(),format='%Y%m%d%H%M')))
-        
+        os.rename(os.path.abspath(d_out+'/temp'),d_out_rn)
+        if self.dumpToBiometDatabase and os.path.isdir(self.config['BiometUser']['Biomet.net']):
+            for outFile,metaData in self.config['fccFinalOutputs'].items():
+                toDump = fnmatch.filter(os.listdir(d_out_rn),f'*{outFile}*')
+                for td in toDump:
+                    dumpToBiometDatabase(siteID=self.siteID,
+                                        biometPath = self.config['BiometUser']['Biomet.net'],
+                                        database = self.config['BiometUser']['Database'],
+                                        inputFile=td,
+                                        metaData=metaData,
+                                        stage='epAutoRun',
+                                        tag='test')
+            
 
 # If called from command line ...
 if __name__ == '__main__':
