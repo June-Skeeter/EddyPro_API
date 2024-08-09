@@ -30,7 +30,8 @@ metadataFiles:
     index_col: [0]
     header: [0,1,2]
 
-rpOutputs:
+# Kwargs fed to pandas for reading intermediate (rp) and final (fcc) output files
+rpIntermediary:
   fluxnet:
     header: [0]
     parse_dates: [0]
@@ -41,6 +42,11 @@ rpOutputs:
     parse_dates: [0,1]
     date_format: '%Y-%m-%d %H:%M'
     keep_date_col: True
+fccFinalOutputs:
+  full_output:
+    header: [1,2]
+    parse_dates: [1,2]
+    date_format: '%Y-%m-%d %H:%M'
 
 groupFiles:
   groupMetaData: f"group_{groupID}_MetaData.metadata"
@@ -274,3 +280,11 @@ eddyProGroupDefs:
     biom_rg: Rg_1_1_1
     biom_lwin: LWIN_1_1_1
     biom_ppfd: PPFD_1_1_1
+
+minBatchSizes:
+  # EddyPro Settings that require a minimum batch size
+  # Assumes batches are HH, can change to dynamic determination later if needed
+  Project:
+    hf_meth:
+      '3': 1400
+      '4': 1400

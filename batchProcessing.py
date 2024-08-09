@@ -30,7 +30,7 @@ def pasteWithSubprocess(source, dest, option = 'copy'):
         cmd=[option, source, dest]
     if cmd:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-
+    print(proc)
 # Copy ghg or dat files and shift timestamp in file name if needed
 # useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
 # Called from preProcessing module, defined here to allow copying to be done in parallel
@@ -45,7 +45,7 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
         if srch is not None:
             file_prototype = inName.replace(srch,fileInfo['ep_date_pattern'])
             TIMESTAMP =  datetime.datetime.strptime(srch,fileInfo['format'])
-            if fileInfo['timeShift'] is not None:
+            if fileInfo['timeShift'] != 'None':
                 TIMESTAMP = TIMESTAMP+datetime.timedelta(minutes=fileInfo['timeShift'])
                 timeString = datetime.datetime.strftime(TIMESTAMP,fileInfo['format'])
                 outName = inName.replace(srch,timeString)
@@ -70,11 +70,11 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
     return(empty)
 
 class Parser():
-    def __init__(self,config,metaDataTemplate=None):
+    def __init__(self,config,metaDataTemplate='None'):
         self.config = config
         # Define statistics to aggregate raw data by, see configuration
         self.agg = [key for key, value in self.config['monitoringInstructions']['dataAggregation'].items() if value is True]
-        if metaDataTemplate is not None:
+        if metaDataTemplate != 'None':
             self.metaDataTemplate,self.fileDescription = self.readMetaData(open(metaDataTemplate))
             self.fileDescription.update(self.config['dat'])
 
@@ -162,21 +162,25 @@ class Parser():
         return(d_agg,col_names)
 
 class runEddyPro():
-    def __init__(self,epRoot,subsetName='1',priority = 'normal',debug=False):
+    def __init__(self,epRoot,subsetNames=['1'],priority = 'normal',debug=False):
         self.epRoot = os.path.abspath(epRoot)
         self.priority = priority
         self.debug = debug
-        self.tempDir = os.path.abspath(f"{os.getcwd()}/temp/{subsetName}")
-        if self.debug == False and os.path.isdir(self.tempDir):
-            shutil.rmtree(self.tempDir)
-        os.makedirs(self.tempDir,exist_ok=True)
+        self.tempDir = {}
+        self.subsetNames = subsetNames
+        for subsetName in subsetNames:
+            self.tempDir[f"{subsetName}"] = os.path.abspath(f"{os.getcwd()}/temp/{subsetName}/")
+            if self.debug == False and os.path.isdir(self.tempDir[f"{subsetName}"]):
+                shutil.rmtree(self.tempDir[f"{subsetName}"])
+            os.makedirs(self.tempDir[f"{subsetName}"],exist_ok=True)
 
     def setUp(self,toRun):
         fname = os.path.basename(toRun)
         toRun = os.path.abspath(toRun)
         cwd = os.getcwd()
         pid = os.getpid()
-        batchRoot = os.path.abspath(f'{self.tempDir}/{pid}')
+        subsetName = [s for s in self.subsetNames if s in toRun][0]
+        batchRoot = os.path.abspath(f'{self.tempDir[subsetName]}/{pid}')
         try:
             shutil.rmtree(batchRoot)
         except:
