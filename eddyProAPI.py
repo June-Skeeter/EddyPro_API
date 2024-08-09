@@ -40,7 +40,7 @@ defaultArgs = {
     'eddyProDynamicConfig':'ini_files/eddyProDynamicConfig.eddypro',
     'GHG_Metadata_Template':'ini_files/GHG_Metadata_Template.metadata',
     'metaDataTemplate':'None',
-    'processes':os.cpu_count()-1,
+    'processes':os.cpu_count()-2,
     'priority':'normal',
     'debug':False,
     'testSet':0,
@@ -49,7 +49,7 @@ defaultArgs = {
     'biometData':'None',
     'dynamicMetadata':'None',
     'userDefinedEddyProSettings':{},
-    'priority':'normal',
+    'priority':'High Priority',
     'searchTag':'',
     'timeShift':'None',
     'biometUser':False,
@@ -57,9 +57,8 @@ defaultArgs = {
     }
 
 class eddyProAPI():
-    os.chdir(dname)
     def __init__(self,**kwargs):
-        
+        os.chdir(dname)
         if isinstance(kwargs, dict):
             pass
         elif os.path.isdir(kwargs):
@@ -138,8 +137,7 @@ class eddyProAPI():
                 outputPath = self.config['Paths']['meta_dir'],
                 biometPath = self.config['BiometUser']['Biomet.net'],
                 database = self.config['BiometUser']['Database'],
-                dateRange = self.dateRange,
-                stage='Second')
+                dateRange = self.dateRange)
             for key,value in auxilaryDpaths.items():
                 setattr(self, key, value)
 
@@ -551,6 +549,7 @@ class runEP(eddyProAPI):
             groupTimeStamps = groupTimeStamps[((groupTimeStamps>=self.dateRange.min())&
                                                (groupTimeStamps<=self.dateRange.max()))]
             ix = pd.Series([i for i in range(groupTimeStamps.shape[0])])
+            self.minBatchSize()
             if ix.shape[0]>self.processes:
                 bins = np.arange(0,self.processes+1)/self.processes
                 labels = np.arange(1,self.processes+1)
@@ -574,7 +573,10 @@ class runEP(eddyProAPI):
                                 groupTimeStamps.min(),
                                 groupTimeStamps.max()+pd.Timedelta(minutes=int(groupInfo['Timing','file_duration','first'])),
                                 groupTimeStamps.shape[0])
-                self.runGroup(groupID)
+                # self.runGroup(groupID)
+
+    def minBatchSize(self):
+        print(self.eddyProStaticConfig['Project']['hf_meth'])
 
     def makeBatch(self,groupID,project_id,groupInfo,batchStart,batchEnd,batchCount):
         file_name = f"{self.tempDir}\{project_id}.eddypro"
@@ -718,18 +720,23 @@ if __name__ == '__main__':
             dt = type('')
         CLI.add_argument(f"--{key}",nargs=nargs,type=dt,default=val)
 
+    CLI.add_argument("--runMode",nargs='?',type=str,default='Full')
+
     # parse the command line
     args = CLI.parse_args()
+
 
     kwargs = vars(args)
     for d in dictArgs:
         kwargs[d] = json.loads(kwargs[d])
-    preProcessing(**kwargs)
+    if kwargs['runMode'] == 'Full' or kwargs['runMode'] == '1':
+        preProcessing(**kwargs)
+    if kwargs['runMode'] == 'Full' or kwargs['runMode'] == '2':
+        runEP(**kwargs)
 
     # # Parse the arguments
     # CLI=argparse.ArgumentParser()
 
-    # CLI.add_argument("--siteID",nargs='+',type=str,default=[],)
     
     # CLI.add_argument("--fileType",nargs="?",type=str,default="ghg",)
 
