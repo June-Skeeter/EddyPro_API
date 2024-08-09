@@ -543,24 +543,23 @@ class runEP(eddyProAPI):
                 
         self.fileInventory = self.fileInventory.dropna()
         ptype = ('Custom','file_prototype','first')
+        self.rpList = []
+        self.fccList = []
+        self.ex_fileList = []    
+        self.groupIDValues = [f"group_{id}" for id in self.configurationGroups.index]
+        self.runEddyPro = batchProcessing.runEddyPro(self.config['Paths']['baseEddyPro'],
+                        self.groupIDValues,self.priority,self.debug)
+        
         for groupID,groupInfo in self.configurationGroups.loc[self.configurationGroups[ptype]!=self.config['stringTags']['exclude']].iterrows():
-            self.rpList = []
             groupTimeStamps = self.fileInventory.loc[self.fileInventory['groupID'].astype('int')==groupID].index
             groupTimeStamps = groupTimeStamps[((groupTimeStamps>=self.dateRange.min())&
                                                (groupTimeStamps<=self.dateRange.max()))]
             ix = pd.Series([i for i in range(groupTimeStamps.shape[0])])
-            self.minBatchSize()
-            if ix.shape[0]>self.processes:
-                bins = np.arange(0,self.processes+1)/self.processes
-                labels = np.arange(1,self.processes+1)
-                batches = pd.qcut(ix,q=bins,labels=labels)
-            elif ix.shape[0]>0:
-                bins = np.arange(0,2)
-                labels = np.arange(1)
-                batches = pd.qcut(ix,q=bins,labels=labels)
             if ix.shape[0]>0:
-                self.runEddyPro = batchProcessing.runEddyPro(self.config['Paths']['baseEddyPro'],
-                                f"group_{groupID}",self.priority,self.debug)
+                self.batchesPerGroup(ix.shape[0],groupID)
+                bins = np.arange(0,self.nBatchesPerGroup+1)/self.nBatchesPerGroup
+                labels = np.arange(1,self.nBatchesPerGroup+1).astype(np.int32)
+                batches = pd.qcut(ix,q=bins,labels=labels)
 
                 for id in batches.unique():
                     self.makeBatch(groupID,f"group_{groupID}_rp_{chr(ord('@')+id)}",
@@ -573,32 +572,49 @@ class runEP(eddyProAPI):
                                 groupTimeStamps.min(),
                                 groupTimeStamps.max()+pd.Timedelta(minutes=int(groupInfo['Timing','file_duration','first'])),
                                 groupTimeStamps.shape[0])
-                # self.runGroup(groupID)
+        if len(self.rpList)<self.processes:self.processes = len(self.rpList)
+        self.runGroups()
 
-    def minBatchSize(self):
-        print(self.eddyProStaticConfig['Project']['hf_meth'])
+    def batchesPerGroup(self,nInGroup,groupID):
+        self.minN = 1
+        minN = 1
+        for section,options in self.config['minBatchSizes'].items():
+            for option, limit in options.items():
+                if section in self.userDefinedEddyProSettings.keys() and option in self.userDefinedEddyProSettings[section].keys() and self.userDefinedEddyProSettings[section][option] in limit.keys():
+                    minN = limit[self.userDefinedEddyProSettings[section][option]]
+                elif self.eddyProStaticConfig[section][option] in limit.keys():
+                    minN = limit[self.eddyProStaticConfig[section][option]]
+                else:
+                    minN = 1
+            self.minN = max(self.minN,minN)
+        self.nBatchesPerGroup = np.floor(nInGroup/self.minN)
+        if self.nBatchesPerGroup < 1:
+            print(f'Warning, available data in group {groupID} is below recommended size for selected settings.' )
+        self.nBatchesPerGroup = max(1,self.nBatchesPerGroup)
+        self.nBatchesPerGroup = min(self.processes,self.nBatchesPerGroup)
 
     def makeBatch(self,groupID,project_id,groupInfo,batchStart,batchEnd,batchCount):
+        id = f'group_{groupID}'
         file_name = f"{self.tempDir}\{project_id}.eddypro"
         if '_rp_' in file_name:
             self.rpList.append(file_name)
             # Dump rp runs from subprocesses to root of group run
-            out_path = self.runEddyPro.tempDir
+            out_path = self.runEddyPro.tempDir[id]
             ex_file = ''
             bin_sp_avail='0'
             sa_bin_spectra=''
             full_sp_avail='0'
             sa_full_spectra=''
         else:
-            self.fccFile = file_name
+            self.fccList.append(file_name)
             # Dump fcc runs to root of temp dir 
             out_path = self.tempDir
-            ex_file = f"{self.runEddyPro.tempDir}/eddypro_{project_id}_fluxnet.csv"
-            sa_bin_spectra=f"{self.runEddyPro.tempDir}/eddypro_binned_cospectra/"
+            ex_file = f"{self.runEddyPro.tempDir[id]}/eddypro_{project_id}_fluxnet.csv"
+            sa_bin_spectra = f"{self.runEddyPro.tempDir[id]}/eddypro_binned_cospectra/"
             bin_sp_avail='1'
-            sa_full_spectra=f"{self.runEddyPro.tempDir}/eddypro_full_cospectra/"
+            sa_full_spectra = f"{self.runEddyPro.tempDir[id]}/eddypro_full_cospectra/"
             full_sp_avail='1'
-            self.ex_file = ex_file
+            self.ex_fileList.append(ex_file)
         print(f'Creating {file_name} for {batchCount} files')
         proj_file = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['groupMetaData'])
         file_prototype = groupInfo['Custom','file_prototype','first']
@@ -617,7 +633,7 @@ class runEP(eddyProAPI):
             self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['eddyProCols'])
         )
 
-        self.groupEddyProConfig = configparser.ConfigParser()
+        self.groupEddyProConfig = configparser.ConfigParser() 
 
         for section in self.eddyProStaticConfig.keys():
             for option,value in self.eddyProStaticConfig[section].items():
@@ -629,22 +645,20 @@ class runEP(eddyProAPI):
                     self.groupEddyProConfig.set(section, option, eddyProCols[section][option])
 
                 # Use evaluate statement for dynamic settings
-                if self.eddyProDynamicConfig.has_section(section) and self.eddyProDynamicConfig.has_option(section, option):    
+                if self.eddyProDynamicConfig.has_section(section) and self.eddyProDynamicConfig.has_option(section, option):  
                     self.groupEddyProConfig.set(section, option, eval(self.eddyProDynamicConfig[section][option]))
 
                 # User supplied variables will overwrite any other settings
                 if section in self.userDefinedEddyProSettings.keys() and option in self.userDefinedEddyProSettings[section].keys():
                     self.groupEddyProConfig.set(section, option,str(self.userDefinedEddyProSettings[section][option]))
-        print(self.groupEddyProConfig['Project']['col_h2o'])
         # Save the run and append to the list of runs
         with open(file_name, 'w') as eddypro:
             eddypro.write(';EDDYPRO_PROCESSING\n')
             self.groupEddyProConfig.write(eddypro,space_around_delimiters=False)
                     
-    def runGroup(self,groupID):
-        print(f'Initiating EddyPro Runs for group {groupID} on {self.processes} cores at {self.priority} priority')
+    def runGroups(self):
+        print(f'Initiating EddyPro Runs for group on {self.processes} cores at {self.priority} priority')
         subProcesIDs = []
-        print(self.rpList)
         if (__name__ == 'eddyProAPI' or __name__ == '__main__') and self.processes>1:
             # run routine in parallel
             pb = progressbar(len(self.rpList),'')
@@ -660,23 +674,31 @@ class runEP(eddyProAPI):
                 out = self.runEddyPro.rpRun(toRun)
                 subProcesIDs.append(out)
         self.rpMerge()
-        subProcesIDs.append(self.runEddyPro.fccRun(self.fccFile))
+        for fcc in self.fccList:
+            subProcesIDs.append(self.runEddyPro.fccRun(fcc))
         self.copyFinalOutputs(subProcesIDs)
     
     def rpMerge(self):
-        for filePattern,kwargs in self.config['rpIntermediary'].items():
-            search_path = os.path.abspath(f"{self.runEddyPro.tempDir}/**{filePattern}**.csv")
-            toMerge = glob(search_path)
-            Temp = pd.DataFrame()
-            if 'parse_dates' in kwargs:
-                val = kwargs['parse_dates']
-                key = tuple(['datetime']+['' for i in range(len(kwargs['header'])-1)])
-                kwargs['parse_dates'] = {key:val}
-            for i,fn in enumerate(toMerge):
-                Temp = pd.concat([Temp,pd.read_csv(fn,**kwargs)])
-            Temp = Temp.set_index(list(kwargs['parse_dates'].keys())[0]).sort_index()
-            Temp = Temp.sort_index()
-            Temp.to_csv(self.ex_file.replace('fluxnet',filePattern),index=False)
+        for groupID in self.configurationGroups.index:
+            for filePattern,kwargs in self.config['rpIntermediary'].items():
+                id = f'group_{groupID}'
+                search_path = os.path.abspath(f"{self.runEddyPro.tempDir[id]}/**{filePattern}**.csv")
+                toMerge = glob(search_path)
+                if len(toMerge)>0:
+                    Temp = pd.DataFrame()
+                    if 'parse_dates' in kwargs and type(kwargs['parse_dates'])==list:
+                        val = kwargs['parse_dates']
+                        key = tuple(['datetime']+['' for i in range(len(kwargs['header'])-1)])
+                        kwargs['parse_dates'] = {key:val}
+                    for i,fn in enumerate(toMerge):
+                        Temp = pd.concat([Temp,pd.read_csv(fn,**kwargs)])
+                    print(self.config['rpIntermediary'].items())
+                    Temp = Temp.set_index(list(kwargs['parse_dates'].keys())[0]).sort_index()
+                    Temp = Temp.sort_index()
+                    fn = [f for f in self.ex_fileList if id in f][0].replace('fluxnet',filePattern)
+                    print('Saving As')
+                    print(fn)
+                    Temp.to_csv(fn,index=False)
 
     def copyFinalOutputs(self,subProcesIDs):
         print(subProcesIDs)
@@ -692,6 +714,7 @@ class runEP(eddyProAPI):
             for outFile,metaData in self.config['fccFinalOutputs'].items():
                 toDump = fnmatch.filter(os.listdir(d_out_rn),f'*{outFile}*')
                 for td in toDump:
+                    print(td)
                     dumpToBiometDatabase(siteID=self.siteID,
                                         biometPath = self.config['BiometUser']['Biomet.net'],
                                         database = self.config['BiometUser']['Database'],
@@ -699,7 +722,6 @@ class runEP(eddyProAPI):
                                         metaData=metaData,
                                         stage='epAutoRun',
                                         tag=self.name)
-            
 
 # If called from command line ...
 if __name__ == '__main__':
@@ -720,54 +742,15 @@ if __name__ == '__main__':
             dt = type('')
         CLI.add_argument(f"--{key}",nargs=nargs,type=dt,default=val)
 
-    CLI.add_argument("--runMode",nargs='?',type=str,default='Full')
+    CLI.add_argument("--runMode",nargs='?',type=str,default='full')
 
     # parse the command line
     args = CLI.parse_args()
 
-
     kwargs = vars(args)
     for d in dictArgs:
         kwargs[d] = json.loads(kwargs[d])
-    if kwargs['runMode'] == 'Full' or kwargs['runMode'] == '1':
+    if kwargs['runMode'] != '2':
         preProcessing(**kwargs)
-    if kwargs['runMode'] == 'Full' or kwargs['runMode'] == '2':
+    if kwargs['runMode'] != '1':
         runEP(**kwargs)
-
-    # # Parse the arguments
-    # CLI=argparse.ArgumentParser()
-
-    
-    # CLI.add_argument("--fileType",nargs="?",type=str,default="ghg",)
-
-    # CLI.add_argument("--metaDataUpdates",nargs="?",type=str,default=None,)
-    
-    # CLI.add_argument("--metadataTemplate",nargs='+',type=str,default=[],)
-
-    # CLI.add_argument("--sourceDir",nargs="?",type=str,default=None,)
-
-    # CLI.add_argument("--searchTag",nargs="?",type=str,default='',)
-
-    # CLI.add_argument("--timeShift",nargs="?",type=int,default=None,)
-  
-    # CLI.add_argument("--reset",nargs="?",type=int,default=0,)
-
-    # CLI.add_argument("--Years",nargs='+',type=int,default=[datetime.now().year],)
-
-    # CLI.add_argument("--Month",nargs='+',type=int,default=[i+1 for i in range(12)],)
-    
-    # CLI.add_argument("--Processes",nargs="?",type=int,default=os.cpu_count(),)
-
-    # # parse the command line
-    # args = CLI.parse_args()
-
-    # for siteID in args.siteID:
-    #     ra = read_ALL(siteID,fileType=args.fileType,metaDataUpdates=args.metaDataUpdates,sourceDir=args.sourceDir,searchTag=args.searchTag,timeShift=args.timeShift)
-    #     for year in args.Years:
-
-    #         for month in args.Month:
-    #             print(f'Processing: {siteID} {year}/{month}')
-    #             t1 = time.time()
-    #             ra.find_files(year,month,args.Processes)
-    #             print(f'Completed in: {np.round(time.time()-t1,4)} seconds')
-

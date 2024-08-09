@@ -162,21 +162,25 @@ class Parser():
         return(d_agg,col_names)
 
 class runEddyPro():
-    def __init__(self,epRoot,subsetName='1',priority = 'normal',debug=False):
+    def __init__(self,epRoot,subsetNames=['1'],priority = 'normal',debug=False):
         self.epRoot = os.path.abspath(epRoot)
         self.priority = priority
         self.debug = debug
-        self.tempDir = os.path.abspath(f"{os.getcwd()}/temp/{subsetName}")
-        if self.debug == False and os.path.isdir(self.tempDir):
-            shutil.rmtree(self.tempDir)
-        os.makedirs(self.tempDir,exist_ok=True)
+        self.tempDir = {}
+        self.subsetNames = subsetNames
+        for subsetName in subsetNames:
+            self.tempDir[f"{subsetName}"] = os.path.abspath(f"{os.getcwd()}/temp/{subsetName}/")
+            if self.debug == False and os.path.isdir(self.tempDir[f"{subsetName}"]):
+                shutil.rmtree(self.tempDir[f"{subsetName}"])
+            os.makedirs(self.tempDir[f"{subsetName}"],exist_ok=True)
 
     def setUp(self,toRun):
         fname = os.path.basename(toRun)
         toRun = os.path.abspath(toRun)
         cwd = os.getcwd()
         pid = os.getpid()
-        batchRoot = os.path.abspath(f'{self.tempDir}/{pid}')
+        subsetName = [s for s in self.subsetNames if s in toRun][0]
+        batchRoot = os.path.abspath(f'{self.tempDir[subsetName]}/{pid}')
         try:
             shutil.rmtree(batchRoot)
         except:

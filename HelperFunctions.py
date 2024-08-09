@@ -23,14 +23,16 @@ def dumpToBiometDatabase(siteID,biometPath,database,inputFile,metaData,stage,tag
     sys.path.insert(1,os.path.abspath(biometPath+'/Python'))
     import binaryFromText as bft
     sys.path.remove(os.path.abspath(biometPath+'/Python'))
-    if tag != '': stage = f"{stage}'_'{tag}"
+    if tag != '': stage = f"{stage}_{tag}"
+    print(inputFile,metaData)
     bft.writeTraces(siteID,
                     inputFile,
                     metaData,
                     database=database,
                     excludeCols=['bad*','x_??%','none*'],
                     mode='repfill',
-                    stage=stage)
+                    stage=stage,
+                    verbose=False)
 
 def instrumentSeparation(northOffset,u,v):
     # for CSAT3
