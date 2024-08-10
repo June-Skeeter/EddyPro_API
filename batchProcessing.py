@@ -82,7 +82,12 @@ class Parser():
         timestamp=file[0]
         filepath=file[1]
         if filepath.endswith('.ghg'):
-            d_agg,metaData = self.extractGHG(filepath,timestamp)
+            try:
+                d_agg,metaData = self.extractGHG(filepath,timestamp)
+            except:
+                print(f"extraction failed for: {filepath}")
+                d_agg,metaData=None,None
+                pass
         else:
             d_agg, d_names = self.readData(filepath,self.fileDescription,timestamp)
             metaData = self.metaDataTemplate.copy()
