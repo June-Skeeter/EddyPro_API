@@ -154,6 +154,7 @@ class eddyProAPI():
                     for val in value:
                         dtypes[(key,val)]=dtype
             for key,value in read_files.items():
+                print(key,value)
                 setattr(self, key,(pd.read_csv(dtype=dtypes,**value)))
         else:
             for key in read_files.keys():
@@ -282,8 +283,9 @@ class preProcessing(eddyProAPI):
                 chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
                 for out in pool.imap(partial(self.Parser.readFile),pathList.items(),chunksize=chunksize):
                     pb.step()
-                    self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
-                    self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
+                    if out[0] is not None:
+                        self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
+                        self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
                 pool.close()
                 pb.close()
         else:
@@ -292,15 +294,19 @@ class preProcessing(eddyProAPI):
                 if i < self.testSet or self.testSet == 0:
                     T2 = time.time()
                     out = self.Parser.readFile((timestamp,file))
-                    self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
-                    self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
-                    print(f'{file} complete, time elapsed:git ',time.time()-T2)
+                    if out[0] is not None:
+                        self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
+                        self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
+                        print(f'{file} complete, time elapsed:git ',time.time()-T2)
         
         self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
         self.metaDataValues.to_csv(self.config['metaDataValues'])
         print('Reading Complete, time elapsed: ',time.time()-T1)
         if self.metaDataUpdates != 'None':
+            print('Applying Manual Metadata Adjustments')
             self.usermetaDataUpdates() 
+            print('Manual Metadata Adjustments Complete')
+
     
     def usermetaDataUpdates(self):
         df = pd.read_csv(self.metaDataUpdates,header=[0,1])
@@ -312,8 +318,10 @@ class preProcessing(eddyProAPI):
                 if col[0] !=  'TIMESTAMP' and pd.isnull(row[col])==False:
                     self.metaDataValues.loc[((self.metaDataValues.index>=row[('TIMESTAMP','Start')]) &
                                             (self.metaDataValues.index<=row[('TIMESTAMP','End')])),col] = str(row[col])
+            
 
     def groupAndFilter(self):
+        print('Grouping by Configuration')
         # As defined in monitoringInstructions, group timestamps by site configurations to define eddyPro Runs
         # Number of samples that should be in a file
         self.metaDataValues['Timing','expectedSamples'] = (self.metaDataValues['Timing']['acquisition_frequency'].astype(float)*60*self.metaDataValues['Timing']['file_duration'].astype(float)).values
@@ -357,10 +365,11 @@ class preProcessing(eddyProAPI):
             self.rawDataStatistics = self.rawDataStatistics.drop(columns=groupLabels.columns[0])
         self.rawDataStatistics = self.rawDataStatistics.join(groupLabels)
         groupLabels.columns=[''.join(col) for col in groupLabels.columns]
-        if groupLabels.columns[0] in self.fileInventory:
-            self.fileInventory = self.fileInventory.drop(columns=groupLabels.columns[0])
+        gcol = groupLabels.columns[0]
+        if gcol in self.fileInventory:
+            self.fileInventory = self.fileInventory.drop(columns=gcol)
         self.fileInventory = self.fileInventory.join(groupLabels)
-
+        self.fileInventory[gcol]=self.fileInventory[gcol].fillna(self.config['intNA']).astype(np.int32)
         # Add the file_prototype template to the configuration groups
                 
         self.makeMetadataFiles()
@@ -381,6 +390,7 @@ class preProcessing(eddyProAPI):
         #   1) A .metadata file representative of all non-dynamic (e.g., canopy height) values
         #   2) A .eddypro file representing the relevant column numbers in the .dat(a) files
           
+        print('Writing Metadata Files')
         eddyProGroupDefsTemplate={'Project':{}} 
         bm = 'RawProcess_BiometMeasurements'
         if self.biometData != 'None': 
@@ -459,9 +469,11 @@ class preProcessing(eddyProAPI):
                 eddyProCols.write(eddypro,space_around_delimiters=False)
 
     def filterData(self):
+        print("Applying Filters:")
         # Alias to simplify eval statement definitions
         Data = self.rawDataStatistics.astype('float')
         for name,rule in self.config['monitoringInstructions']['dataFilters'].items():
+            print(name,rule,'\n')
             for condition,parameters in rule.items():
                 # Identify data columns corresponding to desired variable *or* measurement type
                 col = self.configurationGroups['FileDescription'].apply(

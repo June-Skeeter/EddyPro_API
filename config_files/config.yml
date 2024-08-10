@@ -59,6 +59,7 @@ stringTags:
   NaN: '~'
   exclude: _Exclude_
   groupID: f"group_{groupID}_"
+intNA: -9999
 
 # templates:
 #   variableList: ini_files/VariableNames.ini
