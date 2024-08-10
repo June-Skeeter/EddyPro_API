@@ -224,6 +224,14 @@ monitoringInstructions:
     #     measure_type: mixing_ratio
     #     max_lack: 10 # Eddypro default setting, maxiumum sample data % 
     #     range: [350,550] # If the wind blows this hard > the tower is probably gone already
+    LI7200_Filter:
+      condition_1:
+        variables:
+        - flowrate
+        measure_type:
+        filters:
+          # This will flag anything with a mean flowrate < 10 lpm
+          mean: data.loc[groupIX,variables]<10
 
 eddyProGroupDefs:
   # Template for identifying relevant data file columns (by index #) for dumping into .eddypro files
