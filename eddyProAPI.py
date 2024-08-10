@@ -154,6 +154,7 @@ class eddyProAPI():
                     for val in value:
                         dtypes[(key,val)]=dtype
             for key,value in read_files.items():
+                print(key,value)
                 setattr(self, key,(pd.read_csv(dtype=dtypes,**value)))
         else:
             for key in read_files.keys():
@@ -282,8 +283,9 @@ class preProcessing(eddyProAPI):
                 chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
                 for out in pool.imap(partial(self.Parser.readFile),pathList.items(),chunksize=chunksize):
                     pb.step()
-                    self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
-                    self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
+                    if out[0] is not None:
+                        self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
+                        self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
                 pool.close()
                 pb.close()
         else:
@@ -292,9 +294,10 @@ class preProcessing(eddyProAPI):
                 if i < self.testSet or self.testSet == 0:
                     T2 = time.time()
                     out = self.Parser.readFile((timestamp,file))
-                    self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
-                    self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
-                    print(f'{file} complete, time elapsed:git ',time.time()-T2)
+                    if out[0] is not None:
+                        self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
+                        self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
+                        print(f'{file} complete, time elapsed:git ',time.time()-T2)
         
         self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
         self.metaDataValues.to_csv(self.config['metaDataValues'])
@@ -357,9 +360,11 @@ class preProcessing(eddyProAPI):
             self.rawDataStatistics = self.rawDataStatistics.drop(columns=groupLabels.columns[0])
         self.rawDataStatistics = self.rawDataStatistics.join(groupLabels)
         groupLabels.columns=[''.join(col) for col in groupLabels.columns]
-        if groupLabels.columns[0] in self.fileInventory:
-            self.fileInventory = self.fileInventory.drop(columns=groupLabels.columns[0])
+        gcol = groupLabels.columns[0]
+        if gcol in self.fileInventory:
+            self.fileInventory = self.fileInventory.drop(columns=gcol)
         self.fileInventory = self.fileInventory.join(groupLabels)
+        self.fileInventory[gcol]=self.fileInventory[gcol].fillna(self.config['intNA']).astype(np.float32)
 
         # Add the file_prototype template to the configuration groups
                 
