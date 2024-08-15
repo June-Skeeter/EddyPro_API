@@ -19,7 +19,7 @@ import readLiConfigFiles as rLCF
 importlib.reload(rLCF)
 
 
-def pasteWithSubprocess(source, dest, option = 'copy'):    
+def pasteWithSubprocess(source, dest, option = 'copy',Verbose=False):    
     cmd=None
     if sys.platform.startswith("darwin"): 
         if option == 'copy':
@@ -30,14 +30,15 @@ def pasteWithSubprocess(source, dest, option = 'copy'):
         cmd=[option, source, dest]
     if cmd:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    print(proc)
+    if Verbose==True:
+        print(proc)
 # Copy ghg or dat files and shift timestamp in file name if needed
 # useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
 # Called from preProcessing module, defined here to allow copying to be done in parallel
 # Compares against existing data to avoid re-copying files
 # if dateRange provided, will limit to files within the range
 
-def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True,checkList=[],dateRange=None):
+def findFiles(inName,in_dir,out_dir,fileInfo,checkList=[],dateRange=None):
     # return empty list if 
     empty = [None,None,None,None]
     if inName.endswith(fileInfo['extension']) and fileInfo['searchTag'] in inName and inName not in checkList and fileInfo['excludeTag']+'_'+inName not in checkList:
@@ -52,17 +53,17 @@ def copy_and_check_files(inName,in_dir,out_dir,fileInfo,byYear=True,byMonth=True
             else:
                 outName=inName
             
-            if byYear==True:
-                out_dir = f'{out_dir}/{str(TIMESTAMP.year)}/'
-                if byMonth==True:
-                    out_dir = f'{out_dir}{str(TIMESTAMP.month).zfill(2)}/'
+            # if byYear==True:
+            #     out_dir = f'{out_dir}/{str(TIMESTAMP.year)}/'
+            #     if byMonth==True:
+            #         out_dir = f'{out_dir}{str(TIMESTAMP.month).zfill(2)}/'
             
             if dateRange is None or (TIMESTAMP >= dateRange.min() and TIMESTAMP <= dateRange.max()):
                 source = os.path.abspath(f"{in_dir}/{inName}")
                 dest = os.path.abspath(f"{out_dir}/{outName}")
-                if os.path.isfile(dest)==False:
-                    os.makedirs(out_dir, exist_ok=True)
-                    pasteWithSubprocess(source, dest)
+                # if os.path.isfile(dest)==False:
+                #     os.makedirs(out_dir, exist_ok=True)
+                #     pasteWithSubprocess(source, dest)
                 return([TIMESTAMP,source,outName,file_prototype])
             else:return(empty)
         else:return(empty)
@@ -179,28 +180,8 @@ class runEddyPro():
                 shutil.rmtree(self.tempDir[f"{subsetName}"])
             os.makedirs(self.tempDir[f"{subsetName}"],exist_ok=True)
 
-    def setUp(self,toRun):
-        fname = os.path.basename(toRun)
-        toRun = os.path.abspath(toRun)
-        cwd = os.getcwd()
-        pid = os.getpid()
-        subsetName = [s for s in self.subsetNames if s in toRun][0]
-        batchRoot = os.path.abspath(f'{self.tempDir[subsetName]}/{pid}')
-        try:
-            shutil.rmtree(batchRoot)
-        except:
-            pass
-        bin = os.path.abspath(f'{batchRoot}/bin/')
-        os.makedirs(bin)        
-        pasteWithSubprocess(self.epRoot, bin)
-        ini = os.path.abspath(f'{batchRoot}/ini/')
-        os.makedirs(ini)
-        processing = os.path.abspath(f'{ini}/processing.eddypro')
-        pasteWithSubprocess(toRun,processing,option='move')
-        return(bin)
-
     def rpRun(self,toRun):
-        bin = self.setUp(toRun)
+        bin,toRun = self.setUp(toRun)
         runEddyPro_rp=os.path.abspath(f'{bin}/runEddyPro_rp.bat')
         with open(runEddyPro_rp, 'w') as batch:
             contents = f'cd {bin}'
@@ -220,8 +201,47 @@ class runEddyPro():
         )
         return(os.path.split(bin)[0])
 
+    def setUp(self,toRun):
+        if type(toRun) != str:
+            files = toRun[1]
+            toRun = toRun[0]
+        else:
+            files = 'N/A'
+        fname = os.path.basename(toRun)
+        toRun = os.path.abspath(toRun)
+        cwd = os.getcwd()
+        pid = os.getpid()
+        subsetName = [s for s in self.subsetNames if s in toRun][0]
+        batchRoot = os.path.abspath(f'{self.tempDir[subsetName]}/{pid}')
+        try:
+            shutil.rmtree(batchRoot)
+        except:
+            pass
+        bin = os.path.abspath(f'{batchRoot}/bin/')
+        os.makedirs(bin)        
+        pasteWithSubprocess(self.epRoot, bin)
+        ini = os.path.abspath(f'{batchRoot}/ini/')
+        os.makedirs(ini)
+        processing = os.path.abspath(f'{ini}/processing.eddypro')
+        pasteWithSubprocess(toRun,processing,option='move')
+        dpth = os.path.abspath(f"{batchRoot}/hfData/")
+        os.makedirs(dpth)
+        
+        epFile = configparser.ConfigParser()
+        epFile.read(processing)
+        epFile.set('RawProcess_General', 'data_path', dpth)
+        with open(processing, 'w') as eddypro:
+            eddypro.write(';EDDYPRO_PROCESSING\n')
+            epFile.write(eddypro,space_around_delimiters=False)
+        if type(files) != str:
+            for i,row in files.iterrows():
+                pasteWithSubprocess(
+                    os.path.abspath(row['source']),
+                    os.path.abspath(f"{dpth}/{row['filename']}"))
+        return(bin,toRun)
+
     def fccRun(self,toRun):
-        bin = self.setUp(toRun)
+        bin,toRun = self.setUp(toRun)
         runEddyPro_fcc=os.path.abspath(f'{bin}/runEddyPro_fcc.bat')
         with open(runEddyPro_fcc, 'w') as batch:
             contents = f'cd {bin}'

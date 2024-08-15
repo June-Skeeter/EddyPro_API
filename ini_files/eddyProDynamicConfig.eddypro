@@ -131,7 +131,7 @@ sa_bin_spectra=sa_bin_spectra
 ; sa_gas4_g1_stop=
 
 [RawProcess_General]
-data_path=self.config['Paths']['raw']
+; data_path=f"{self.config['Paths']['raw']}/group_{groupID}"
 ; recurse=
 ; use_geo_north=
 ; mag_dec=

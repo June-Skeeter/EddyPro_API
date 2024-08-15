@@ -218,13 +218,6 @@ monitoringInstructions:
           # filters can be given as a single string, or a list of different conditions
           min: Data.loc[groupIX,variables]<-100
           max: Data.loc[groupIX,variables]>100
-    # CO2_Filter:
-    #   condition_1:
-    #     variable:
-    #     - co2
-    #     measure_type: mixing_ratio
-    #     max_lack: 10 # Eddypro default setting, maxiumum sample data % 
-    #     range: [350,550] # If the wind blows this hard > the tower is probably gone already
     LI7200_Filter:
       condition_1:
         variables:
@@ -232,7 +225,13 @@ monitoringInstructions:
         measure_type:
         filters:
           # This will flag anything with a mean flowrate < 10 lpm
-          mean: data.loc[groupIX,variables]<10
+          mean: Data.loc[groupIX,variables]<10
+      condition_2:
+        variables:
+        - avg_signal_strength_7200
+        measure_type:
+        filters:
+          mean: Data.loc[groupIX,variables]<90
 
 eddyProGroupDefs:
   # Template for identifying relevant data file columns (by index #) for dumping into .eddypro files
