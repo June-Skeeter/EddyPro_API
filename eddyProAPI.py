@@ -176,8 +176,6 @@ class eddyProAPI():
         else:
             sys.exit('Quitting')
 
-# class preProcessing(eddyProAPI):
-    # def __init__(self,**kwargs):
     def preProcessing(self):
         mainTime = time.time()
         # super().__init__(**kwargs)
@@ -512,38 +510,6 @@ class eddyProAPI():
                         else:
                             self.fileInventory.loc[self.fileInventory['groupID']==groupID,'Filter Flags'] = (self.fileInventory.loc[self.fileInventory['groupID']==groupID,'Filter Flags'].str.replace(self.config['stringTags']['NaN'],'')+f',{name}: Data not available').str.lstrip(',')
         self.fileInventory.loc[self.fileInventory['Filter Flags'] != self.config['stringTags']['NaN'],'groupID'] = self.config['intNA']
-    # File names are modified to facilitate EddyPro processing them by group
-    # def renameFiles(self):
-    #     # Loop through flagged records and prepend the filename with an exclusion tag
-    #     for i,row in self.fileInventory.loc[
-    #         ((self.fileInventory['Filter Flags']!=self.config['stringTags']['NaN'])&
-    #         (self.fileInventory['filename'].str.startswith(self.config['stringTags']['exclude'])==False))
-    #         ].iterrows():
-    #         old_fn = row['filename']
-    #         new_fn = self.config['stringTags']['exclude']+row['filename']
-    #         dpth = f"{self.config['Paths']['raw']}/{i.year}/{str(i.month).zfill(2)}/"
-    #         if os.path.isfile(f"{dpth}/{new_fn}"):
-    #             print(f"renaming for exclusion: {old_fn} to {new_fn}")
-    #             os.remove(f"{dpth}/{new_fn}")
-    #         os.rename(f"{dpth}/{old_fn}",f"{dpth}/{new_fn}")
-    #         self.fileInventory.loc[self.fileInventory.index==i,'filename']=new_fn
-    #     # Loop through good records and prepend the filename with the group name
-    #     for i,row in self.fileInventory.loc[(
-    #         (self.fileInventory['Filter Flags']==self.config['stringTags']['NaN'])&
-    #         # (self.fileInventory['filename'].str.match(self.genericID)==False)&
-    #         (self.fileInventory['filename']!=self.config['stringTags']['NaN'])
-    #         )].iterrows():
-    #         groupID = row['groupID']
-    #         old_fn = row['filename']
-    #         file_prototype = eval(self.config['stringTags']['groupID'])+row['file_prototype']
-    #         new_fn = f"{eval(self.config['stringTags']['groupID'])}{row['filename']}"
-    #         print(new_fn)
-    #         # dpth = f"{self.config['Paths']['raw']}/{i.year}/{str(i.month).zfill(2)}/"
-    #         self.fileInventory.loc[self.fileInventory.index==i,['filename','file_prototype']]=new_fn,file_prototype
-    #         # if os.path.isfile(f"{dpth}/{new_fn}"):
-    #         #     os.remove(f"{dpth}/{new_fn}")
-    #         # os.rename(f"{dpth}/{old_fn}",f"{dpth}/{new_fn}")      
-    #     # self.saveMetadataFiles()
 
     def saveMetadataFiles(self):
         # Save the revised inventory
@@ -552,14 +518,7 @@ class eddyProAPI():
         self.metaDataValues.to_csv(self.config['metaDataValues'])
         self.configurationGroups.to_csv(self.config['configurationGroups'])
         
-# class runEP(eddyProAPI):
-#     def __init__(self,**kwargs):
     def runEP(self):
-        # kwargs['reset'] = False
-        # if 'processes' not in kwargs:
-        #     kwargs['processes']=int(os.cpu_count()/2)
-        # super().__init__(**kwargs)
-        
         mainTime = time.time()
         self.setupGroups()
         self.runGroups()
@@ -567,12 +526,14 @@ class eddyProAPI():
         print(f"runEP complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
 
     def setupGroups(self):
-        self.tempDir = os.path.abspath(os.getcwd()+'/temp/')
+        self.tempDir = os.path.abspath(dname+'/temp/')
         if self.debug == False and os.path.isdir(self.tempDir):
             shutil.rmtree(self.tempDir)
             os.mkdir(self.tempDir)
-            with open(os.getcwd()+'/temp/.gitignore', 'w') as ig:
+            with open(self.tempDir+'.gitignore', 'w') as ig:
                 ig.write('*')
+        elif os.path.isdir(self.tempDir) == False:
+            os.mkdir(self.tempDir)
                 
         self.fileInventory = self.fileInventory.dropna()
         ptype = ('Custom','file_prototype','first')
@@ -695,7 +656,7 @@ class eddyProAPI():
             self.groupEddyProConfig.write(eddypro,space_around_delimiters=False)
                     
     def runGroups(self):
-        print(f'Initiating EddyPro Runs for group on {self.processes} cores at {self.priority} priority')
+        print(f'Initiating EddyPro Runs on {self.processes} cores at {self.priority} priority')
         self.subProcesIDs = []
         if (__name__ == 'eddyProAPI' or __name__ == '__main__') and self.processes>1:
             # run routine in parallel
@@ -745,7 +706,7 @@ class eddyProAPI():
                 shutil.rmtree(toDel)
         d_out = os.path.abspath(self.config['Paths']['output_path'])
         d_out_rn = os.path.abspath(d_out+'/'+datetime.strftime(datetime.now(),format='%Y%m%d%H%M'))
-        d_in = os.path.abspath(f"{os.getcwd()}/temp/")
+        d_in = os.path.abspath(self.tempDir)
         batchProcessing.pasteWithSubprocess(d_in,d_out,option='move')
         os.rename(os.path.abspath(d_out+'/temp'),d_out_rn)
         if self.biometUser and os.path.isdir(self.config['BiometUser']['Biomet.net']):
