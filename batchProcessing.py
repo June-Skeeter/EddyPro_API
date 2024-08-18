@@ -174,14 +174,16 @@ class runEddyPro():
         self.debug = debug
         self.tempDir = {}
         self.subsetNames = subsetNames
+        abspath = os.path.abspath(__file__)
+        dname = os.path.dirname(abspath)
         for subsetName in subsetNames:
-            self.tempDir[f"{subsetName}"] = os.path.abspath(f"{os.getcwd()}/temp/{subsetName}/")
+            self.tempDir[f"{subsetName}"] = os.path.abspath(f"{dname}/temp/{subsetName}/")
             if self.debug == False and os.path.isdir(self.tempDir[f"{subsetName}"]):
                 shutil.rmtree(self.tempDir[f"{subsetName}"])
             os.makedirs(self.tempDir[f"{subsetName}"],exist_ok=True)
 
     def rpRun(self,toRun):
-        bin,toRun = self.setUp(toRun)
+        bin,toRun,dpth = self.setUp(toRun)
         runEddyPro_rp=os.path.abspath(f'{bin}/runEddyPro_rp.bat')
         with open(runEddyPro_rp, 'w') as batch:
             contents = f'cd {bin}'
@@ -199,7 +201,31 @@ class runEddyPro():
             os.path.abspath(f'{bin}/rp_processing_log.txt'),
             os.path.abspath(toRun.replace('.eddypro','_log.txt'))
         )
+        if self.debug == False:
+            shutil.rmtree(dpth)
         return(os.path.split(bin)[0])
+    
+    def fccRun(self,toRun):
+        bin,toRun,dpth = self.setUp(toRun)
+        runEddyPro_fcc=os.path.abspath(f'{bin}/runEddyPro_fcc.bat')
+        with open(runEddyPro_fcc, 'w') as batch:
+            contents = f'cd {bin}'
+            P = self.priority.lower().replace(' ','')
+            contents+='\nSTART powershell  ".\\eddypro_fcc.exe | tee fcc_processing_log.txt"'
+            contents+='\nping 127.0.0.1 -n 6 > nul'
+            contents+=f'\nwmic process where name="eddypro_fcc.exe" CALL setpriority "{self.priority}"'
+            contents+='\nping 127.0.0.1 -n 6 > nul'
+            contents+='\nEXIT'
+            batch.write(contents)
+
+        subprocess.run(['cmd', '/c', runEddyPro_fcc], capture_output=True)
+
+        pasteWithSubprocess(
+            os.path.abspath(f'{bin}/fcc_processing_log.txt'),
+            os.path.abspath(toRun.replace('.eddypro','_log.txt'))
+        )
+        return(os.path.split(bin)[0])
+
 
     def setUp(self,toRun):
         if type(toRun) != str:
@@ -209,7 +235,7 @@ class runEddyPro():
             files = 'N/A'
         fname = os.path.basename(toRun)
         toRun = os.path.abspath(toRun)
-        cwd = os.getcwd()
+        # cwd = os.getcwd()
         pid = os.getpid()
         subsetName = [s for s in self.subsetNames if s in toRun][0]
         batchRoot = os.path.abspath(f'{self.tempDir[subsetName]}/{pid}')
@@ -238,25 +264,4 @@ class runEddyPro():
                 pasteWithSubprocess(
                     os.path.abspath(row['source']),
                     os.path.abspath(f"{dpth}/{row['filename']}"))
-        return(bin,toRun)
-
-    def fccRun(self,toRun):
-        bin,toRun = self.setUp(toRun)
-        runEddyPro_fcc=os.path.abspath(f'{bin}/runEddyPro_fcc.bat')
-        with open(runEddyPro_fcc, 'w') as batch:
-            contents = f'cd {bin}'
-            P = self.priority.lower().replace(' ','')
-            contents+='\nSTART powershell  ".\\eddypro_fcc.exe | tee fcc_processing_log.txt"'
-            contents+='\nping 127.0.0.1 -n 6 > nul'
-            contents+=f'\nwmic process where name="eddypro_fcc.exe" CALL setpriority "{self.priority}"'
-            contents+='\nping 127.0.0.1 -n 6 > nul'
-            contents+='\nEXIT'
-            batch.write(contents)
-
-        subprocess.run(['cmd', '/c', runEddyPro_fcc], capture_output=True)
-
-        pasteWithSubprocess(
-            os.path.abspath(f'{bin}/fcc_processing_log.txt'),
-            os.path.abspath(toRun.replace('.eddypro','_log.txt'))
-        )
-        return(os.path.split(bin)[0])
+        return(bin,toRun,dpth)
