@@ -38,7 +38,7 @@ def pasteWithSubprocess(source, dest, option = 'copy',Verbose=False):
 # Compares against existing data to avoid re-copying files
 # if dateRange provided, will limit to files within the range
 
-def findFiles(inName,in_dir,out_dir,fileInfo,checkList=[],dateRange=None):
+def findFiles(inName,in_dir,fileInfo,checkList=[],dateRange=None):
     # return empty list if 
     empty = [None,None,None,None]
     if inName.endswith(fileInfo['extension']) and fileInfo['searchTag'] in inName and inName not in checkList and fileInfo['excludeTag']+'_'+inName not in checkList:
@@ -47,23 +47,14 @@ def findFiles(inName,in_dir,out_dir,fileInfo,checkList=[],dateRange=None):
             file_prototype = inName.replace(srch,fileInfo['ep_date_pattern'])
             TIMESTAMP =  datetime.datetime.strptime(srch,fileInfo['format'])
             if fileInfo['timeShift'] != 'None':
+                fileInfo['timeShift'] = float(fileInfo['timeShift'])
                 TIMESTAMP = TIMESTAMP+datetime.timedelta(minutes=fileInfo['timeShift'])
                 timeString = datetime.datetime.strftime(TIMESTAMP,fileInfo['format'])
                 outName = inName.replace(srch,timeString)
             else:
                 outName=inName
-            
-            # if byYear==True:
-            #     out_dir = f'{out_dir}/{str(TIMESTAMP.year)}/'
-            #     if byMonth==True:
-            #         out_dir = f'{out_dir}{str(TIMESTAMP.month).zfill(2)}/'
-            
             if dateRange is None or (TIMESTAMP >= dateRange.min() and TIMESTAMP <= dateRange.max()):
                 source = os.path.abspath(f"{in_dir}/{inName}")
-                dest = os.path.abspath(f"{out_dir}/{outName}")
-                # if os.path.isfile(dest)==False:
-                #     os.makedirs(out_dir, exist_ok=True)
-                #     pasteWithSubprocess(source, dest)
                 return([TIMESTAMP,source,outName,file_prototype])
             else:return(empty)
         else:return(empty)
@@ -161,6 +152,7 @@ class Parser():
 
         # Generate the aggregation statistics, but only for numeric columns
         data = data._get_numeric_data()
+        data = data.loc[:,[c for c in data.columns if c not in self.config['monitoringInstructions']['dataExclude']]]
         d_agg = data.agg(self.agg)
         d_agg['Timestamp'] = timestamp
         d_agg.set_index('Timestamp', append=True, inplace=True)

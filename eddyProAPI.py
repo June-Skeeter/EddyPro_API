@@ -34,7 +34,7 @@ os.chdir(dname)
 defaultArgs = {
     'runMode':'full',
     'siteID':'SomeSite',
-    'sourceDir':'',
+    'sourceDir':[],
     'dateRange':[date(datetime.now().year,1,1).strftime("%Y-%m-%d"),datetime.now().strftime("%Y-%m-%d")],
     'fileType':'ghg',
     'eddyProStaticConfig':'ini_files/LabStandard_Advanced.eddypro',
@@ -121,25 +121,25 @@ class eddyProAPI():
             self.config['Paths'][key] = eval(val)
             if os.path.isdir(self.config['Paths'][key]) == False:
                 os.makedirs(self.config['Paths'][key])
+        
+        if self.sourceDir == []:
+            self.sourceDir = self.config['Paths']['sourceDir']
 
         for key in self.config['metadataFiles'].keys():
-            self.config[key] = self.config['Paths']['meta_dir']+key+'.csv'
+            self.config[key] = self.config['Paths']['metaDir']+key+'.csv'
             self.config['metadataFiles'][key]['filepath_or_buffer'] = self.config[key]
-
         # Read the existing metadata from a previous run if they exist
         if self.reset == True: self.resetInventory()
-
         # Create the directories if they doesn't exist
-        os.makedirs(self.config['Paths']['meta_dir'],exist_ok=True)
-        os.makedirs(self.config['Paths']['raw'],exist_ok=True)
-
+        os.makedirs(self.config['Paths']['metaDir'],exist_ok=True)
+        os.makedirs(self.config['Paths']['outputDir'],exist_ok=True)
         # On the fly Biomet and dynamicMetadata csv file generation
         # For Biomet.net users only
         if self.biometUser and os.path.isdir(self.config['BiometUser']['Biomet.net']):
             print('Biomet user: Querying database for up-to-date biomet data')
             auxilaryDpaths=queryBiometDatabase(
                 siteID=self.siteID,
-                outputPath = self.config['Paths']['meta_dir'],
+                outputPath = self.config['Paths']['metaDir'],
                 biometPath = self.config['BiometUser']['Biomet.net'],
                 database = self.config['BiometUser']['Database'],
                 dateRange = self.dateRange)
@@ -167,53 +167,46 @@ class eddyProAPI():
     def resetInventory(self):
         RESET = input(f"WARNING!! You are about to complete a reset: type RESET to continue, provide any other input + enter to exit the application")
         if RESET.upper() == 'RESET':
-            if os.path.isdir(self.config['Paths']['meta_dir']):
-                print(f"Deleting contents of : {self.config['Paths']['meta_dir']}")
-                shutil.rmtree(self.config['Paths']['meta_dir'])
-            if os.path.isdir(self.config['Paths']['raw']):
-                print(f"Deleting contents of : {self.config['Paths']['raw']}")
-                shutil.rmtree(self.config['Paths']['raw'])
+            if os.path.isdir(self.config['Paths']['metaDir']):
+                print(f"Deleting contents of : {self.config['Paths']['metaDir']}")
+                shutil.rmtree(self.config['Paths']['metaDir'])
+            if os.path.isdir(self.config['Paths']['outputDir']):
+                print(f"Deleting contents of : {self.config['Paths']['outputDir']}")
+                shutil.rmtree(self.config['Paths']['outputDir'])
         else:
             sys.exit('Quitting')
 
     def preProcessing(self):
         mainTime = time.time()
-        # super().__init__(**kwargs)
-                
         # Initiate parser class, defined externally to facilitate parallel processing
         self.Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
-        if self.debug == False:
-            self.searchRawDir()
-            self.readFiles()
-            if self.metaDataUpdates != 'None':
-                print('Applying Manual Metadata Adjustments')
-                self.usermetaDataUpdates() 
-                print('Manual Metadata Adjustments Complete')
-            self.groupAndFilter()
+        self.searchRawDir()
+        self.readFiles()
+        if self.metaDataUpdates != 'None':
+            print('Applying Manual Metadata Adjustments')
+            self.usermetaDataUpdates() 
+            print('Manual Metadata Adjustments Complete')
+        self.groupAndFilter()
         print(f"Pre-Processing complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
         
     def searchRawDir(self):
         # Build the file inventory of the "raw" directory and copy new files if needed
         # Option to shift the timestamp: copy data and rename using shifted timestamp
         # timeShift will only be applied to data copied from another directory
-        # search_dirs = [self.config['Paths']['raw']]
-        # shiftTime = ['None']
         search_dirs = []
         shiftTime = []
-        if os.path.isdir(self.sourceDir):
-            search_dirs.append(self.sourceDir)
-            shiftTime.append(self.timeShift)
-        elif type(self.sourceDir) == list:
+        if type(self.sourceDir) == list:
             for d in self.sourceDir:
                 if os.path.isdir(d):
                     search_dirs.append(d)
                     shiftTime.append(self.timeShift)
-
+        elif os.path.isdir(self.sourceDir):
+            search_dirs.append(self.sourceDir)
+            shiftTime.append(self.timeShift)
         T1 = time.time()
         fileInfo = self.config[self.fileType]
         fileInfo['searchTag'] = self.searchTag
         fileInfo['excludeTag'] = self.genericID
-
         # Walk the search directories
         for search,timeShift in zip(search_dirs,shiftTime):
             fileInfo['timeShift'] = timeShift
@@ -235,7 +228,7 @@ class eddyProAPI():
                         with Pool(processes=self.processes) as pool:
                             max_chunksize=10
                             chunksize=min(int(np.ceil(len(fileList)/self.processes)),max_chunksize)
-                            for out in pool.imap(partial(batchProcessing.findFiles,in_dir=dir,out_dir=self.config['Paths']['raw'],fileInfo=fileInfo,dateRange=self.dateRange),fileList,chunksize=chunksize):
+                            for out in pool.imap(partial(batchProcessing.findFiles,in_dir=dir,fileInfo=fileInfo,dateRange=self.dateRange),fileList,chunksize=chunksize):
                                 pb.step()
                                 dout.append(out)
                             pool.close()
@@ -245,7 +238,7 @@ class eddyProAPI():
                         testOffset=0
                         for i,filename in enumerate(fileList):
                             if self.debug == False or i < self.testSet + testOffset or self.testSet == 0:
-                                out = batchProcessing.findFiles(filename,dir,self.config['Paths']['raw'],fileInfo=fileInfo,dateRange=self.dateRange)
+                                out = batchProcessing.findFiles(filename,dir,fileInfo=fileInfo,dateRange=self.dateRange)
                                 if out[0] is None and self.testSet > 0:
                                     testOffset += 1
                                 dout.append(out)
@@ -260,7 +253,6 @@ class eddyProAPI():
                     df = df.loc[df['filename'].isnull()==False]
                     # Merge with existing inventory   
                     self.fileInventory = pd.concat([self.fileInventory,df])
-        
         # Quit if no data were found
         if self.fileInventory.empty:
             sys.exit('No Data Found')
@@ -268,7 +260,6 @@ class eddyProAPI():
         self.fileInventory = self.fileInventory.resample('30T').first()
         # Fill empty string columns
         self.fileInventory = self.fileInventory.fillna(self.config['stringTags']['NaN'])
-
         # Sort so that oldest files get processed first
         self.fileInventory = self.fileInventory.sort_index()#ascending=False)
         # Save inventory
@@ -284,9 +275,7 @@ class eddyProAPI():
             (self.fileInventory.index.isin(self.metaDataValues.index)==False)&
             (self.fileInventory.index>=self.dateRange.min())&(self.fileInventory.index<=self.dateRange.max())
             )].copy()
-
         # Call file handler to parse files in parallel (default) or sequentially for troubleshooting
-
         pathList = to_process['source']
         if (__name__ == 'eddyProAPI' or __name__ == '__main__') and self.processes>1 and len(pathList) > 0:
             # run routine in parallel
@@ -296,9 +285,7 @@ class eddyProAPI():
                 chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
                 for out in pool.imap(partial(self.Parser.readFile),pathList.items(),chunksize=chunksize):
                     pb.step()
-                    if out[0] is not None:
-                        self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
-                        self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
+                    self.mergeStats(out)
                 pool.close()
                 pb.close()
         else:
@@ -307,14 +294,28 @@ class eddyProAPI():
                 if i < self.testSet or self.testSet == 0:
                     T2 = time.time()
                     out = self.Parser.readFile((timestamp,file))
-                    if out[0] is not None:
-                        self.rawDataStatistics = pd.concat([self.rawDataStatistics,out[0]])
-                        self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
-                        print(f'{file} complete, time elapsed:git ',np.round(time.time()-T2,3))
+                    self.mergeStats(out,file)
+                if self.debug == True:
+                    print(f'{file} complete, time elapsed:git ',np.round(time.time()-T2,3)) 
         
         self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
         self.metaDataValues.to_csv(self.config['metaDataValues'])
         print('Reading Complete, time elapsed: ',np.round(time.time()-T1,3))
+
+    def mergeStats(self,out):
+        if out[0] is not None:
+            for i,o in enumerate(out):
+                # Fill any "missing" column levels
+                cols = o.columns
+                nuCols = []
+                for c in cols:
+                    c = [a if a != '' else self.config['stringTags']['NaN'] for a in c]
+                    nuCols.append(tuple(c))
+                o.columns = pd.MultiIndex.from_tuples(nuCols)
+                if i == 0:
+                    self.rawDataStatistics = pd.concat([self.rawDataStatistics,o])
+                elif i == 1:
+                    self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
     
     def usermetaDataUpdates(self):
         df = pd.read_csv(self.metaDataUpdates,header=[0,1])
@@ -365,37 +366,32 @@ class eddyProAPI():
         self.configurationGroups = self.configurationGroups.join(self.metaDataValues[group_cols].groupby(by=self.groupID).agg(['first','count']))
         pass_cols = [self.groupID]+passer
         self.configurationGroups = self.configurationGroups.join(self.metaDataValues[pass_cols].groupby(by=self.groupID).agg(['first']))
-
         # add the group labels to the statistics table
-        groupLabels = groupLabels.T.set_index(np.repeat('', groupLabels.shape[1]), append=True).T
+        groupLabels = groupLabels.T.set_index(np.repeat(self.config['stringTags']['NaN'], groupLabels.shape[1]), append=True).T
         if groupLabels.columns[0] in self.rawDataStatistics:
             self.rawDataStatistics = self.rawDataStatistics.drop(columns=groupLabels.columns[0])
         self.rawDataStatistics = self.rawDataStatistics.join(groupLabels)
-        groupLabels.columns=[''.join(col) for col in groupLabels.columns]
+        print(groupLabels.columns)
+        groupLabels.columns=[(''.join(col)).replace(self.config['stringTags']['NaN'],'') for col in groupLabels.columns]
+        print(groupLabels.columns)
         gcol = groupLabels.columns[0]
         if gcol in self.fileInventory:
             self.fileInventory = self.fileInventory.drop(columns=gcol)
         self.fileInventory = self.fileInventory.join(groupLabels)
         self.fileInventory[gcol]=self.fileInventory[gcol].fillna(self.config['intNA']).astype(np.int32)
         # Add the file_prototype template to the configuration groups
-                
         self.makeMetadataFiles()
-        self.filterData()
-        # self.renameFiles()
-        
+        self.filterData()        
         temp = self.fileInventory[list(groupLabels.columns)+['file_prototype']].groupby(list(groupLabels.columns)).agg(['first'])
         temp.columns = pd.MultiIndex.from_product([['Custom']]+temp.columns.levels)
         self.configurationGroups = self.configurationGroups.join(temp)
         ptype = ('Custom','file_prototype','first')
-        # self.configurationGroups.loc[self.configurationGroups[ptype].str.match(self.genericID)==False,
-        #                              ptype] = self.config['stringTags']['exclude']
         self.saveMetadataFiles()
 
     def makeMetadataFiles(self):
         # Creates two files
         #   1) A .metadata file representative of all non-dynamic (e.g., canopy height) values
         #   2) A .eddypro file representing the relevant column numbers in the .dat(a) files
-          
         print('Writing Metadata Files')
         eddyProGroupDefsTemplate={'Project':{}} 
         bm = 'RawProcess_BiometMeasurements'
@@ -435,14 +431,12 @@ class eddyProAPI():
                         nkey = key.replace('*',str(i+1))
                         if nkey in groupMetaData[section]:
                             metaDataFile[section][nkey] = groupMetaData[section][nkey]
-
-            filename = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['groupMetaData'])
+            filename = self.config['Paths']['metaDir']+eval(self.config['groupFiles']['groupMetaData'])
             with open(filename, 'w') as groupMetaData:
                 groupMetaData.write(';GHG_METADATA\n')
                 cfg = configparser.ConfigParser()
                 cfg.read_dict(metaDataFile)
                 cfg.write(groupMetaData,space_around_delimiters=False)
-                
             # Identify the column numbers relevant to EddyPro
             eddyProGroupDefs=eddyProGroupDefsTemplate.copy()
             row.index = row.index.get_level_values(1)
@@ -456,20 +450,17 @@ class eddyProAPI():
                     meas_ix = [i.split('_')[1] for i,v in (row[measurement_types]==m).items() if v == True]
                     if len(meas_ix)>0:
                         break
-                
                 col_num = list(set(var_ix) & set(meas_ix))
                 if len(col_num)==1:
                     col_num = col_num[0]
                 else:
                     col_num = '0'
                 eddyProGroupDefs['Project'][key] = col_num
-
             file_prototype = self.fileInventory.loc[self.fileInventory['groupID']==groupID,'file_prototype'].values[0]
             eddyProCols = configparser.ConfigParser()
             eddyProCols.read_dict(eddyProGroupDefs)
-                
             # Save the run and append to the list of runs
-            filename = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['eddyProCols'])
+            filename = self.config['Paths']['metaDir']+eval(self.config['groupFiles']['eddyProCols'])
             with open(filename, 'w') as eddypro:
                 eddypro.write(';EDDYPRO_PROCESSING\n')
                 eddyProCols.write(eddypro,space_around_delimiters=False)
@@ -543,8 +534,6 @@ class eddyProAPI():
         self.groupIDValues = [f"group_{id}" for id in self.configurationGroups.index]
         self.runEddyPro = batchProcessing.runEddyPro(self.config['Paths']['baseEddyPro'],
                         self.groupIDValues,self.priority,self.debug)
-        
-        # for groupID,groupInfo in self.configurationGroups.loc[self.configurationGroups[ptype]!=self.config['stringTags']['exclude']].iterrows():
         for groupID,groupInfo in self.configurationGroups.iterrows():
             groupTimeStamps = self.fileInventory.loc[self.fileInventory['groupID']==groupID].index
             groupTimeStamps = groupTimeStamps[((groupTimeStamps>=self.dateRange.min())&
@@ -555,7 +544,6 @@ class eddyProAPI():
                 bins = np.arange(0,self.nBatchesPerGroup+1)/self.nBatchesPerGroup
                 labels = np.arange(1,self.nBatchesPerGroup+1).astype(np.int32)
                 batches = pd.qcut(ix,q=bins,labels=labels)
-
                 for id in batches.unique():
                     self.makeBatch(groupID,f"group_{groupID}_rp_{chr(ord('@')+id)}",
                                 groupInfo,
@@ -590,8 +578,6 @@ class eddyProAPI():
     def makeBatch(self,groupID,project_id,groupInfo,batchStart,batchEnd,batchCount):
         id = f'group_{groupID}'
         file_name = f"{self.tempDir}\{project_id}.eddypro"
-        if os.path.isdir(self.config['Paths']['raw']+f"/group_{groupID}/") == False:
-            os.makedirs(self.config['Paths']['raw']+f"/group_{groupID}/")
         if '_rp_' in file_name:
             self.rpBatches[file_name] = self.fileInventory.loc[((self.fileInventory.index>=batchStart)&
                                            (self.fileInventory.index<=batchEnd)&
@@ -615,7 +601,7 @@ class eddyProAPI():
             full_sp_avail='1'
             self.ex_fileList.append(ex_file)
         print(f'Creating {file_name} for {batchCount} files')
-        proj_file = self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['groupMetaData'])
+        proj_file = self.config['Paths']['metaDir']+eval(self.config['groupFiles']['groupMetaData'])
         file_prototype = groupInfo['Custom','file_prototype','first']
         master_sonic = groupInfo['Instruments','instr_1_model','first']
         if file_prototype.endswith('.ghg'):
@@ -629,7 +615,7 @@ class eddyProAPI():
                        
         eddyProCols = configparser.ConfigParser()
         eddyProCols.read(
-            self.config['Paths']['meta_dir']+eval(self.config['groupFiles']['eddyProCols'])
+            self.config['Paths']['metaDir']+eval(self.config['groupFiles']['eddyProCols'])
         )
 
         self.groupEddyProConfig = configparser.ConfigParser() 
@@ -704,7 +690,7 @@ class eddyProAPI():
         for toDel in self.subProcesIDs:
             if os.path.isdir(toDel):
                 shutil.rmtree(toDel)
-        d_out = os.path.abspath(self.config['Paths']['output_path'])
+        d_out = os.path.abspath(self.config['Paths']['outputDir'])
         d_out_rn = os.path.abspath(d_out+'/'+datetime.strftime(datetime.now(),format='%Y%m%d%H%M'))
         d_in = os.path.abspath(self.tempDir)
         batchProcessing.pasteWithSubprocess(d_in,d_out,option='move')
@@ -739,6 +725,7 @@ if __name__ == '__main__':
         elif dt == type([]):
             nargs = '+'
             dt = type('')
+        
         CLI.add_argument(f"--{key}",nargs=nargs,type=dt,default=val)
 
     # parse the command line
