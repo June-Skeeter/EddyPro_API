@@ -22,12 +22,15 @@ importlib.reload(rLCF)
 def pasteWithSubprocess(source, dest, option = 'copy',Verbose=False):    
     cmd=None
     if sys.platform.startswith("darwin"): 
-        if option == 'copy':
+        # These need to be tested/flushed out
+        if option == 'copy' or option == 'xcopy':
             cmd=['cp', source, dest]
         elif option == 'move':
             cmd=['mv',source,dest]
     elif sys.platform.startswith("win"): 
         cmd=[option, source, dest]
+        if option == 'xcopy':
+            cmd.append('/s')
     if cmd:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     if Verbose==True:
@@ -76,8 +79,9 @@ class Parser():
         if filepath.endswith('.ghg'):
             try:
                 d_agg,metaData = self.extractGHG(filepath,timestamp)
-            except:
+            except Exception as e:
                 print(f"extraction failed for: {filepath}")
+                print(e)
                 d_agg,metaData=None,None
                 pass
         else:
