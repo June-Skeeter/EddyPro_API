@@ -118,7 +118,7 @@ class eddyProAPI():
         # Setup paths using definitions from config file
         self.config['Paths'] = {}
         for key,val in self.config['RelativePaths'].items():
-            self.config['Paths'][key] = eval(val)
+            self.config['Paths'][key] = os.path.abspath(eval(val))
             if os.path.isdir(self.config['Paths'][key]) == False:
                 os.makedirs(self.config['Paths'][key])
         
@@ -126,7 +126,7 @@ class eddyProAPI():
             self.sourceDir = self.config['Paths']['sourceDir']
 
         for key in self.config['metadataFiles'].keys():
-            self.config[key] = self.config['Paths']['metaDir']+key+'.csv'
+            self.config[key] = os.path.abspath(self.config['Paths']['metaDir']+'/'+key+'.csv')
             self.config['metadataFiles'][key]['filepath_or_buffer'] = self.config[key]
         # Read the existing metadata from a previous run if they exist
         if self.reset == True: self.resetInventory()
@@ -294,7 +294,7 @@ class eddyProAPI():
                 if i < self.testSet or self.testSet == 0:
                     T2 = time.time()
                     out = self.Parser.readFile((timestamp,file))
-                    self.mergeStats(out,file)
+                    self.mergeStats(out)
                 if self.debug == True:
                     print(f'{file} complete, time elapsed:git ',np.round(time.time()-T2,3)) 
         
@@ -617,22 +617,17 @@ class eddyProAPI():
         eddyProCols.read(
             self.config['Paths']['metaDir']+eval(self.config['groupFiles']['eddyProCols'])
         )
-
         self.groupEddyProConfig = configparser.ConfigParser() 
-
         for section in self.eddyProStaticConfig.keys():
             for option,value in self.eddyProStaticConfig[section].items():
                 if not self.groupEddyProConfig.has_section(section):
                     self.groupEddyProConfig.add_section(section)
                 self.groupEddyProConfig.set(section, option, value)
-
                 if eddyProCols.has_section(section) and eddyProCols.has_option(section, option):
                     self.groupEddyProConfig.set(section, option, eddyProCols[section][option])
-
                 # Use evaluate statement for dynamic settings
                 if self.eddyProDynamicConfig.has_section(section) and self.eddyProDynamicConfig.has_option(section, option):  
                     self.groupEddyProConfig.set(section, option, eval(self.eddyProDynamicConfig[section][option]))
-
                 # User supplied variables will overwrite any other settings
                 if section in self.userDefinedEddyProSettings.keys() and option in self.userDefinedEddyProSettings[section].keys():
                     self.groupEddyProConfig.set(section, option,str(self.userDefinedEddyProSettings[section][option]))
@@ -690,20 +685,21 @@ class eddyProAPI():
         for toDel in self.subProcesIDs:
             if os.path.isdir(toDel):
                 shutil.rmtree(toDel)
-        d_out = os.path.abspath(self.config['Paths']['outputDir'])
-        d_out_rn = os.path.abspath(d_out+'/'+datetime.strftime(datetime.now(),format='%Y%m%d%H%M'))
+        d_out = os.path.abspath(self.config['Paths']['outputDir']+'/'+datetime.strftime(datetime.now(),format='%Y%m%d%H%M'))
         d_in = os.path.abspath(self.tempDir)
-        batchProcessing.pasteWithSubprocess(d_in,d_out,option='move')
-        os.rename(os.path.abspath(d_out+'/temp'),d_out_rn)
+        if os.path.isdir(d_out) == False:
+            os.makedirs(d_out)
+        batchProcessing.pasteWithSubprocess(d_in,d_out,option='xcopy')
+        shutil.rmtree(d_in)
         if self.biometUser and os.path.isdir(self.config['BiometUser']['Biomet.net']):
             for outFile,metaData in self.config['fccFinalOutputs'].items():
-                toDump = fnmatch.filter(os.listdir(d_out_rn),f'*{outFile}*')
+                toDump = fnmatch.filter(os.listdir(d_out),f'*{outFile}*')
                 for td in toDump:
                     print(td)
                     dumpToBiometDatabase(siteID=self.siteID,
                                         biometPath = self.config['BiometUser']['Biomet.net'],
                                         database = self.config['BiometUser']['Database'],
-                                        inputFile=f"{d_out_rn}/{td}",
+                                        inputFile=f"{d_out}/{td}",
                                         metaData=metaData,
                                         stage='epAutoRun',
                                         tag=self.name)
