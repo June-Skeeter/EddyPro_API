@@ -136,6 +136,8 @@ class Parser():
         
         if 'na_values' in fileDescription.keys():
             data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
+        elif 'assumeDefaultNAs' in self.config.keys() and len(self.config['assumeDefaultNAs'])>0:
+            data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=self.config['assumeDefaultNAs'])
         else:
             data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'])
             
@@ -145,7 +147,13 @@ class Parser():
         # Parse units from metadata if not included in headers
         if len(fileDescription['header_rows']) == 1:
             unit_list = [value for key,value in fileDescription.items() if 'unit_in' in key]
-            data.columns = [data.columns,unit_list]
+            try:
+                data.columns = [data.columns,unit_list]
+            except:
+                data = data.dropna(how='all',axis=1).copy()
+                data.columns = [data.columns,unit_list]
+                print(f'Dropped NaN columns in {dataFile} to force metadata match')
+                pass
 
 
         data = data.dropna(how='all',axis=1)

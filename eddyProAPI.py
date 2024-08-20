@@ -165,7 +165,7 @@ class eddyProAPI():
                 setattr(self, key,pd.DataFrame())            
 
     def resetInventory(self):
-        RESET = input(f"WARNING!! You are about to complete a reset: type RESET to continue, provide any other input + enter to exit the application")
+        RESET = input(f"WARNING!! You are about to complete a reset:\ntype RESET to continue, provide any other input + enter to exit the application \n\n")
         if RESET.upper() == 'RESET':
             if os.path.isdir(self.config['Paths']['metaDir']):
                 print(f"Deleting contents of : {self.config['Paths']['metaDir']}")
@@ -346,8 +346,8 @@ class eddyProAPI():
                    if key in self.metaDataValues.columns.get_level_values(0)
                    for val in value
                    for v in fnmatch.filter(self.metaDataValues[key].columns,val)]  
-        self.metaDataValues[grouper] = self.metaDataValues[grouper].fillna(self.config['stringTags']['NaN'])
-        self.metaDataValues[grouper] = self.metaDataValues[grouper].replace('',self.config['stringTags']['NaN'])
+        self.metaDataValues[grouper+passer] = self.metaDataValues[grouper+passer].fillna(self.config['stringTags']['NaN'])
+        self.metaDataValues[grouper+passer] = self.metaDataValues[grouper+passer].replace('',self.config['stringTags']['NaN'])
         # Generate group labels based off unique configurations of groupBy values
         self.groupID = ('group','ID')
         groupLabels = pd.DataFrame(columns=pd.MultiIndex.from_tuples([self.groupID]),
@@ -471,7 +471,7 @@ class eddyProAPI():
         Data = self.rawDataStatistics.astype('float')
         self.fileInventory['Filter Flags'] = self.config['stringTags']['NaN']
         for name,rule in self.config['monitoringInstructions']['dataFilters'].items():
-            print('\n',name,':')
+            print(name,':')
             for condition,parameters in rule.items():
                 print(condition)
                 # Identify data columns corresponding to desired variable *or* measurement type
@@ -491,11 +491,11 @@ class eddyProAPI():
                     groupIX = (Data.loc[:,pd.IndexSlice[['group'],['ID']]]==groupID).max(axis=1).values
                     for stat,filter in parameters['filters'].items():
                         variables = pd.IndexSlice[h,:,[stat]]
-                        print(stat,'variables',h,'criteria',filter)
                         if self.config['stringTags']['NaN'] not in h:
                             test = eval(filter).max(axis=1)
                             flag = test[test==True].index
-                            print(flag.shape)
+                            print(stat,'variables',h,'criteria',filter)
+                            print('nfiltered: ',flag.shape[0])
                             # Add a filter flag to exclude timestamps from EddyPro runs and list the corresponding exclusion condition
                             self.fileInventory.loc[flag.values,'Filter Flags'] = (self.fileInventory.loc[flag.values,'Filter Flags'].str.replace(self.config['stringTags']['NaN'],'')+f',{name}: {condition}').str.lstrip(',')
                         else:

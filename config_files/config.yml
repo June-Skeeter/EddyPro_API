@@ -59,6 +59,8 @@ stringTags:
   exclude: _Exclude_
   groupID: f"group_{groupID}_"
 intNA: -9999
+assumeDefaultNAs:
+- -9999
 
 # templates:
 #   variableList: ini_files/VariableNames.ini
@@ -206,7 +208,6 @@ monitoringInstructions:
   - Nanoseconds
   - Sequence Number
     
-
   dataFilters:
     Sonic_Filter:
       condition_1:
@@ -298,7 +299,7 @@ eddyProGroupDefs:
 minBatchSizes:
   # EddyPro Settings that require a minimum batch size
   # Assumes batches are HH, can change to dynamic determination later if needed
-  Project:
-    hf_meth:
-      '3': 48
-      '4': 48
+  # Project:
+  #   hf_meth:
+  #     '3': 48
+  #     '4': 48
