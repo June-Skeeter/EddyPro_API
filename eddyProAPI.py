@@ -41,7 +41,7 @@ defaultArgs = {
     'eddyProDynamicConfig':'ini_files/eddyProDynamicConfig.eddypro',
     'GHG_Metadata_Template':'ini_files/GHG_Metadata_Template.metadata',
     'metaDataTemplate':'None',
-    'processes':os.cpu_count()-2,
+    'processes':os.cpu_count()-1,
     'priority':'normal',
     'debug':False,
     'testSet':0,
@@ -182,12 +182,12 @@ class eddyProAPI():
         self.Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
         self.searchRawDir()
         self.readFiles()
-        if self.metaDataUpdates != 'None':
-            print('Applying Manual Metadata Adjustments')
-            self.usermetaDataUpdates() 
-            print('Manual Metadata Adjustments Complete')
-        self.groupAndFilter()
-        print(f"Pre-Processing complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
+        # if self.metaDataUpdates != 'None':
+        #     print('Applying Manual Metadata Adjustments')
+        #     self.usermetaDataUpdates() 
+        #     print('Manual Metadata Adjustments Complete')
+        # self.groupAndFilter()
+        # print(f"Pre-Processing complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
         
     def searchRawDir(self):
         # Build the file inventory of the "raw" directory and copy new files if needed
@@ -268,38 +268,42 @@ class eddyProAPI():
     
     def readFiles(self):
         T1 = time.time()
-        print('Reading Data')
+        print('Reading Data for:')
         # Parse down to just files that need to be processed (those which have not already been assigned a group or set to exclude)
         to_process = self.fileInventory.loc[(
             (self.fileInventory['source'].str.endswith(self.fileType))&
             (self.fileInventory.index.isin(self.metaDataValues.index)==False)&
             (self.fileInventory.index>=self.dateRange.min())&(self.fileInventory.index<=self.dateRange.max())
-            )].copy()
+            ),'source'].copy()
         # Call file handler to parse files in parallel (default) or sequentially for troubleshooting
-        pathList = to_process['source']
-        if (__name__ == 'eddyProAPI' or __name__ == '__main__') and self.processes>1 and len(pathList) > 0:
-            # run routine in parallel
-            pb = progressbar(len(pathList),'')
-            with Pool(processes=self.processes) as pool:
-                max_chunksize=4
-                chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
-                for out in pool.imap(partial(self.Parser.readFile),pathList.items(),chunksize=chunksize):
-                    pb.step()
-                    self.mergeStats(out)
-                pool.close()
-                pb.close()
-        else:
-            # run routine sequentially
-            for i, (timestamp,file) in enumerate(pathList.items()):
-                if i < self.testSet or self.testSet == 0:
-                    T2 = time.time()
-                    out = self.Parser.readFile((timestamp,file))
-                    self.mergeStats(out)
-                if self.debug == True:
-                    print(f'{file} complete, time elapsed:git ',np.round(time.time()-T2,3)) 
-        
-        self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
-        self.metaDataValues.to_csv(self.config['metaDataValues'])
+        byMonth = to_process.resample('MS').count()
+        for m,v in byMonth.items():
+            if v >0:
+                print(f"{m.year}-{m.month}")
+                pathList = to_process.loc[((to_process.index.year == m.year)&(to_process.index.month == m.month))]
+                if (__name__ == 'eddyProAPI' or __name__ == '__main__') and self.processes>1 > 0:
+                    # run routine in parallel
+                    pb = progressbar(len(pathList),'')
+                    with Pool(processes=self.processes) as pool:
+                        max_chunksize=4
+                        chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
+                        for out in pool.imap(partial(self.Parser.readFile),pathList.items(),chunksize=chunksize):
+                            pb.step()
+                            self.mergeStats(out)
+                        pool.close()
+                        pb.close()
+                else:
+                    # run routine sequentially
+                    for i, (timestamp,file) in enumerate(pathList.items()):
+                        if i < self.testSet or self.testSet == 0:
+                            T2 = time.time()
+                            out = self.Parser.readFile((timestamp,file))
+                            self.mergeStats(out)
+                        if self.debug == True:
+                            print(f'{file} complete, time elapsed:git ',np.round(time.time()-T2,3)) 
+                
+                self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
+                self.metaDataValues.to_csv(self.config['metaDataValues'])
         print('Reading Complete, time elapsed: ',np.round(time.time()-T1,3))
 
     def mergeStats(self,out):

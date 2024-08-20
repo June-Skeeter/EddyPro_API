@@ -65,8 +65,9 @@ def findFiles(inName,in_dir,fileInfo,checkList=[],dateRange=None):
     return(empty)
 
 class Parser():
-    def __init__(self,config,metaDataTemplate='None'):
+    def __init__(self,config,metaDataTemplate='None',verbose=False):
         self.config = config
+        self.verbose = verbose
         # Define statistics to aggregate raw data by, see configuration
         self.agg = [key for key, value in self.config['monitoringInstructions']['dataAggregation'].items() if value is True]
         if metaDataTemplate != 'None':
@@ -98,9 +99,7 @@ class Parser():
         ghgInventory = {}
         with zipfile.ZipFile(filepath, 'r') as ghgZip:
             subFiles=ghgZip.namelist()
-            # Get all possible contents of ghg file
-            # For now only concerned with .data and .metadata
-            # Will expand to biomet and config/calibration files later
+            # Get all possible contents of ghg file, for now only concerned with .data and .metadata, can expand to biomet and config/calibration files later
             for f in subFiles:
                 ghgInventory[f.replace(base,'')]=f
             metaData,fileDescription = self.readMetaData(TextIOWrapper(ghgZip.open(ghgInventory['.metadata']), 'utf-8'))
@@ -108,7 +107,6 @@ class Parser():
             if hasattr(fileDescription, 'skip_rows') == False:
                 fileDescription['skip_rows'] = int(fileDescription['header_rows'])-1
                 fileDescription['header_rows'] = [0]
-
             d_agg, d_names = self.readData(ghgZip.open(ghgInventory['.data']),fileDescription,timestamp)
             metaData.update(d_names)
         return(d_agg,metaData)
@@ -121,11 +119,9 @@ class Parser():
         metaData = configparser.ConfigParser()
         metaData.read_file(metaDataFile)
         metaData = {key:dict(metaData[key]) for key in metaData.keys()}
-
         # Isolate and parse file description for reading data files
         fileDescription = metaData['FileDescription'].copy()
         fileDescription['delimiter'] = self.config['delimiters'][fileDescription['separator']].encode('ascii','ignore').decode('unicode_escape')
-
         # Reformat for dumping to DataFrame        
         metaData = {(k1,k2):val for k1 in metaData.keys() for k2,val in metaData[k1].items()}
         return(metaData,fileDescription)
@@ -133,14 +129,12 @@ class Parser():
     def readData(self,dataFile,fileDescription,timestamp):
         # read the raw high frequency data
         # parse the column names and output desired aggregation statistics for each raw data file
-        
         if 'na_values' in fileDescription.keys():
             data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
         elif 'assumeDefaultNAs' in self.config.keys() and len(self.config['assumeDefaultNAs'])>0:
             data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=self.config['assumeDefaultNAs'])
         else:
             data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'])
-            
         if fileDescription['data_label'] != 'Not set':
             # .ghg data files contain a "DATA" label if first column which isn't needed
             data = data.drop(data.columns[0],axis=1)
@@ -152,16 +146,14 @@ class Parser():
             except:
                 data = data.dropna(how='all',axis=1).copy()
                 data.columns = [data.columns,unit_list]
-                print(f'Dropped NaN columns in {dataFile} to force metadata match')
+                if self.verbose == True:
+                    print(f'Dropped NaN columns in {dataFile.name} to force metadata match')
                 pass
-
-
         data = data.dropna(how='all',axis=1)
         # generate dict of column names to add back into Metadata
         col_names = {}
         for i,c in enumerate(data.columns.get_level_values(0)):
             col_names[('Custom',f'col_{i+1}_header_name')] = c
-
         # Generate the aggregation statistics, but only for numeric columns
         data = data._get_numeric_data()
         data = data.loc[:,[c for c in data.columns if c not in self.config['monitoringInstructions']['dataExclude']]]
