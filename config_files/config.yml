@@ -296,10 +296,13 @@ eddyProGroupDefs:
     biom_lwin: LWIN_1_1_1
     biom_ppfd: PPFD_1_1_1
 
-minBatchSizes:
+minDataReq:
   # EddyPro Settings that require a minimum batch size
   # Assumes batches are HH, can change to dynamic determination later if needed
-  # Project:
-  #   hf_meth:
-  #     '3': 48
-  #     '4': 48
+  Project:
+    hf_meth:
+      '3': 1350
+      '4': 1350
+batchSize:
+  max: 48
+  min: 2

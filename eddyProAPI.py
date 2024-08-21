@@ -37,9 +37,9 @@ defaultArgs = {
     'sourceDir':[],
     'dateRange':[date(datetime.now().year,1,1).strftime("%Y-%m-%d"),datetime.now().strftime("%Y-%m-%d")],
     'fileType':'ghg',
-    'eddyProStaticConfig':'ini_files/LabStandard_Advanced.eddypro',
-    'eddyProDynamicConfig':'ini_files/eddyProDynamicConfig.eddypro',
-    'GHG_Metadata_Template':'ini_files/GHG_Metadata_Template.metadata',
+    'eddyProStaticConfig':'Templates/DefaultSettings.eddypro',
+    'eddyProDynamicConfig':'config_files/eddyProDynamicConfig.ini',
+    'GHG_Metadata_Template':'config_files/GHG_Metadata_Template.metadata',
     'metaDataTemplate':'None',
     'processes':os.cpu_count()-1,
     'priority':'normal',
@@ -182,12 +182,12 @@ class eddyProAPI():
         self.Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
         self.searchRawDir()
         self.readFiles()
-        # if self.metaDataUpdates != 'None':
-        #     print('Applying Manual Metadata Adjustments')
-        #     self.usermetaDataUpdates() 
-        #     print('Manual Metadata Adjustments Complete')
-        # self.groupAndFilter()
-        # print(f"Pre-Processing complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
+        if self.metaDataUpdates != 'None':
+            print('Applying Manual Metadata Adjustments')
+            self.usermetaDataUpdates() 
+            print('Manual Metadata Adjustments Complete')
+        self.groupAndFilter()
+        print(f"Pre-Processing complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
         
     def searchRawDir(self):
         # Build the file inventory of the "raw" directory and copy new files if needed
@@ -564,7 +564,7 @@ class eddyProAPI():
     def batchesPerGroup(self,nInGroup,groupID):
         self.minN = 1
         minN = 1
-        for section,options in self.config['minBatchSizes'].items():
+        for section,options in self.config['minDataReq'].items():
             for option, limit in options.items():
                 if section in self.userDefinedEddyProSettings.keys() and option in self.userDefinedEddyProSettings[section].keys() and self.userDefinedEddyProSettings[section][option] in limit.keys():
                     minN = limit[self.userDefinedEddyProSettings[section][option]]
@@ -573,11 +573,12 @@ class eddyProAPI():
                 else:
                     minN = 1
             self.minN = max(self.minN,minN)
+        if nInGroup<self.minN:
+            print(f'Warning, available data in group {groupID} is below recommended size for selected settings.')
+        self.minN = max(max(self.config['batchSize']['min'],nInGroup),self.config['batchSize']['max'])
         self.nBatchesPerGroup = np.floor(nInGroup/self.minN)
-        if self.nBatchesPerGroup < 1:
-            print(f'Warning, available data in group {groupID} is below recommended size for selected settings.' )
-        self.nBatchesPerGroup = max(1,self.nBatchesPerGroup)
-        self.nBatchesPerGroup = min(self.processes,self.nBatchesPerGroup)
+        self.nBatchesPerGroup = min(self.processes,max(1,self.nBatchesPerGroup))
+        print(self.nBatchesPerGroup)
 
     def makeBatch(self,groupID,project_id,groupInfo,batchStart,batchEnd,batchCount):
         id = f'group_{groupID}'

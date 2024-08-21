@@ -1,28 +1,40 @@
 # EddyPro API
 
-Created by Dr. June Skeeter under an open copyright license.
-
-This project is still under development.
+Written and maintained by Dr. June Skeeter under an open copyright license&copy;.
 
 # About
 
-This API is intended to streamline flux estimation using Eddy Pro.  The API allows you to run EddyPro in parallel, high-priority batches to mininmize computation times.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI.
+[EddyPro&reg;](https://www.licor.com/env/support/EddyPro/topics/introduction.html#top) is a popular software application for processing high frequency Eddy Covariance (EC) data via a graphic user interface (GUI).  This application program interface (API) can be used to automate and parallelize processing with Eddy Pro&reg; to mininmize computation times.
 
-## Intro
+## Workflow
 
-Eddy Covariance (EC) is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses (e.g., CO_2).  Flux esimation via EC involves applying a Reynolds Opperators to high frequency (>=10 Hz) measurements of scalar conentrations and 3D winds over 30- to 60-minute intervals.  This is a computationally expensive procedure, and when it must be repeated over months or years of data, it quickly becomes an incredibly time consuming procedure.
+There are two main things the API does.
 
-One of the most popular applications for processing EC data is EddyPro (LICOR).  "EddyPro is designed to provide easy, accurate EC flux computations." [see](https://www.licor.com/env/support/EddyPro/topics/introduction.html#top)  The application has a graphic user interface (GUI) that allows apply a standard processing pipeline or selectively apply more advanced filtering and correction procedures as needed.  The backend of the processing routine is then executed in FORTRAN, and eddypro outputs fluxes estimates and supplemental data as .csv files.
+1. **Pre-processing**: finds the data within the source directory, parses .  
 
-The EddyPro API (Application Program Interfae) is a python wrapper for the EddyPro GUI that allows for automation of flux processing procedures defined usising the EddyPro GUI, and more rapid processing of EC data via parallel processing.
+    a. Generate .csv files of biomet data and dynamic metadata as needed (**for Biomet.Net database users**).
+    b. Search the source directory for all files in specified format (e.g., .ghg, .dat, etc.) covering the desired time period.
+    c. Read all relevant data and embedded metadata (.ghg files) and generate descriptive statistics for each interval.
+        * If embedded metadata are not available, the user can provide a template .metadata file to serve as a basis for processing.  This file can be created using EddyPro or a text editor.  
+            * See **Templates/CR1000_LI7500_Template.metadata** for an example.  This .metadata file is for a simple setup consisting of a CSAT3 and a LI75000 logged at 10Hz on a CR1000.
+    d. Filter data to exclude intervals with poor quality data that would prohibit reliable flux estimation. e.g., we can exclude intervals with mean flow rate <10 lpm for a LI-2700.
+        * See **config_files/config.yml**: monitoringInstructions>dataFilters for a full list of filters or to add more of your own
+    e. Overwrite metadata (embedded or template) with time varying metadata from a .csv file.
+        * See **Templates/Manual_Metadata_Updates.csv** for an example
+            * The file defines when settings were changed using TIMESTAMP Start and TIMESTAMP End (optional).  If an end is not provided, the change is assumed permanent, until another change is defined in the overwrite file.  If an end is provided the change only applies to the time periods between (inclusive of) the Start and End TIMESTAMP.  Only metadata that were changed should be defined for a given record.  Records are specified in two column headers corresponding to their section and key values in a LICOR .metadata file.
+    f. Group the data by periods of common configurations, so EddyPro will only be run on periods with equivalent settings.
+        * e.g., if sensor separation changed, the data before and after the change would be run as separate groups for the purpose of generating representative spectral corrections
 
-# Installation
 
-## For a Personal Computer
+2. **Running EddyPro&reg**; takes the results of the pre-processing routine and uses it to generate and execute batch runs of EddyPro in parallel.  The outputs are then stitched together into homogenous files and can be output into binary Biomet.Net database format if desired.
 
-This will **only** work on windows for now, there are plans to expand to mac/linux ... eventually.
+# Installation & Setup
 
-1. Create the virtual environment and install dependencies
+For now, the API will **only** work on windows.  There are plans to expand to mac/linux ... eventually.
+
+1. [Install EddyPro](https://www.licor.com/env/support/EddyPro/software.html).  Make not of where the root installation of EddyPro ends up (e.g., C:/Program Files/LI-COR/EddyPro-7.0.9/) as you will need this later
+
+2. Create the virtual environment and install dependencies
 
 * If you're using VSCode, it should autodetect the requirements.txt dependency list.  Open the EddyPro_API folder in VSCode.   Then hit ctrl+shift+p > type "Python" and select "Create Environment" then select requirements.txt when prompted.
 
@@ -32,11 +44,11 @@ This will **only** work on windows for now, there are plans to expand to mac/lin
 
     `CD /Path/to/EddyPro_API`
     
-    b. To create the .venv type the following command.  *Note* if "python3" doesn't work, try python, py, py3 etc.  It will depend on how python is named on your system
+    b. To create the .venv type the following command.  *Note* if "py" doesn't work, try python, python, py3, python3 etc.  It will depend on how python is named on your system
 
-    `python3 -m venv .venv`
+    `py -m venv .venv`
 
-    c. Activate the virtual environment
+    c. Activate the virtual environment.  *Note* if you are on a system which restricts the execution of scripts, first you need to temporarily set your execution policy in order to activate the environment: `Set-ExecutionPolicy Unrestricted -Scope Process`
 
     `.\.venv\Scripts\activate`
 
@@ -44,42 +56,26 @@ This will **only** work on windows for now, there are plans to expand to mac/lin
 
     `pip install -r requirements.txt`
 
-## For Winmet
+3. Make a copy of **config_files/user_path_definitions_template.yml** and name it **config_files\user_path_definitions.yml** then update the paths accordingly.
 
-* Open the EddyPro_AIP in VSCode then open the powershell console.  Winmet requires you to temporarily override some settings to get things to work:
+* The API needs to be pointed to you base installation of EddyPro.  Make sure you are running v7.0.9
+* The API also needs you to define a working directory where outputs should be saved. If you were to set `workingDir: C:/highfreq/` then you would end up with outputs stored in  C:/highfreq/siteID/metadata and C:/highfreq/siteID/eddyProAPIOutputs
 
-```
-Set-ExecutionPolicy Unrestricted -Scope Process
-.\.venv\Scripts\activate
-```
+# Running the API
 
+The API can be called via command line; instructions are given below.  You can also run it vai API_Run.ipynb if you prefer.
 
-## Workflow
+1. Before running EddyPro, you should decide which settings you want to use.  You can select an appropriate .eddypro file from the Templates folder or use an existing .eddypro file form previous work.
 
-For now, stick to using the jupyter notebook *API_Run.ipynb*, command line instructions will be mad available soon.
+* The template files can be used to define the processing parameters and ensure they remain standardized between runs.  They can be inspected using the EddyPro GUI or a text editor.  It is suggested to use 'ClosedPathStandard.eddypro' for systems with an closed path analyzers (e.g., LI-7200) and 'OpenPathStandard.eddypro' for systems without any close path analyzers.  You can also define your own template file by modifying a template in the GUI or with a text editor and saving with a new filename name.
+    * How will these files be used?  The API will read the settings from these files and then dynamically update settings in EddyPro (paths, dates, etc.) to automate runs.  Settings that will be overwritten can be found in **config_files/eddyProDynamicConfig.ini**
 
-### Setup
+2. Call the API
 
-* If you're on WinMet, it should already be setup, but check config_files\user_path_definitions.yml to make sure things are pointing in the right direction.
+    a. Activate the virtual environment.  *Note* if you are on a system which restricts the execution of scripts, first you need to temporarily set your execution policy in order to activate the environment: `Set-ExecutionPolicy Unrestricted -Scope Process`
 
-* If you're on a personal computer, make a copy of config_files/user_path_definitions_template.yml and name it config_files\user_path_definitions.yml then define the paths accordingly.
+    `.\.venv\Scripts\activate`
 
-### Preprocessing
+    b. Call the program.  In this example, the program will execute for the current year, on the BB site, using Templates/ClosedPathStandard.eddypro to define the processing procedures.  Since biometUser was set to true the API will auto generate csv files containing biomet (e.g., TA, PAR, etc.) and dynamic metadata (e.g., canopy height) before running and will dump results form the "full_output" files to the Biomet.Net database format.
 
-1. Create the "auxillary data", which includes a biomet.CSV file and a dynamicMetadata.csv file.  If you're a Biomet.Net user, you can read these directly from the database.
-
-2. Read high frequency data in .ghg or .dat format.  If you're using .ghg files, it should handle everything automatically unless there are metadata settings you need to override.  If you're using .dat files, you'll need to provide one or more (if settings change drastically) .metadata files in LICOR's metadata format.  You can use the EddyPro GUI to set one up, or use a template (to be added later).
-
-### Running Eddypro
-
-Use one of the EddyPro Templates provided, then overwrite any settings you want with a user defined dict or yaml file with the following format:
-
-`{section:{key:value}}`
-
-Run the API over you desired dates then inspec the output.
-
-## Pending Tasks
-
-* Enhance documentation
-* Update naming conventions and handling of output files to be more organized and prevent overwriting outputs
-* Put metadata update files in more sensible (site specific) location
+    `py eddyProAPI.py --siteID BB --biometUser True --eddyProStaticConfig Templates/ClosedPathStandard.eddypro`
