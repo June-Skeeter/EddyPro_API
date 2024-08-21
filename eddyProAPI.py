@@ -281,13 +281,13 @@ class eddyProAPI():
             if v >0:
                 print(f"{m.year}-{m.month}")
                 pathList = to_process.loc[((to_process.index.year == m.year)&(to_process.index.month == m.month))]
-                if (__name__ == 'eddyProAPI' or __name__ == '__main__') and self.processes>1 > 0:
+                if (__name__ == 'eddyProAPI' or __name__ == '__main__') and self.processes>1:
                     # run routine in parallel
                     pb = progressbar(len(pathList),'')
-                    with Pool(processes=self.processes) as pool:
-                        max_chunksize=4
-                        chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
-                        for out in pool.imap(partial(self.Parser.readFile),pathList.items(),chunksize=chunksize):
+                    with Pool(processes=self.processes,maxtasksperchild=100) as pool:
+                        # max_chunksize=4
+                        # chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
+                        for out in pool.imap(partial(self.Parser.readFile),pathList.items()):#,chunksize=chunksize):
                             pb.step()
                             self.mergeStats(out)
                         pool.close()
@@ -516,8 +516,9 @@ class eddyProAPI():
     def runEP(self):
         mainTime = time.time()
         self.setupGroups()
-        self.runGroups()
-        self.copyFinalOutputs()
+        print(self.processes)
+        # self.runGroups()
+        # self.copyFinalOutputs()
         print(f"runEP complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
 
     def setupGroups(self):
@@ -575,10 +576,9 @@ class eddyProAPI():
             self.minN = max(self.minN,minN)
         if nInGroup<self.minN:
             print(f'Warning, available data in group {groupID} is below recommended size for selected settings.')
-        self.minN = max(max(self.config['batchSize']['min'],nInGroup),self.config['batchSize']['max'])
+        self.minN = min(max(self.config['batchSize']['min'],nInGroup),self.config['batchSize']['max'])
         self.nBatchesPerGroup = np.floor(nInGroup/self.minN)
         self.nBatchesPerGroup = min(self.processes,max(1,self.nBatchesPerGroup))
-        print(self.nBatchesPerGroup)
 
     def makeBatch(self,groupID,project_id,groupInfo,batchStart,batchEnd,batchCount):
         id = f'group_{groupID}'
