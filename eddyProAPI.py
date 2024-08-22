@@ -158,6 +158,7 @@ class eddyProAPI():
                     dtypes[(key,val)]=dtype
         for key,value in read_files.items():
             if os.path.isfile(value['filepath_or_buffer']):
+                print(value['filepath_or_buffer'])
                 setattr(self, key,(pd.read_csv(dtype=dtypes,**value)))
             else:
                 setattr(self, key,pd.DataFrame())            
@@ -176,8 +177,6 @@ class eddyProAPI():
 
     def preProcessing(self):
         mainTime = time.time()
-        # Initiate parser class, defined externally to facilitate parallel processing
-        self.Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
         self.searchRawDir()
         self.readFiles()
         if self.metaDataUpdates != 'None':
@@ -277,6 +276,8 @@ class eddyProAPI():
         byMonth = to_process.resample('MS').count()
 
         for m,v in byMonth.items():
+            # Initiate parser class, defined externally to facilitate parallel processing
+            Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
             T2 = time.time()
             if v >0:
                 print(f"{m.year}-{m.month}")
@@ -285,9 +286,9 @@ class eddyProAPI():
                     # run routine in parallel
                     pb = progressbar(len(pathList),'')
                     with Pool(processes=self.processes,maxtasksperchild=100) as pool:
-                        # max_chunksize=4
-                        # chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
-                        for out in pool.imap(partial(self.Parser.readFile),pathList.items()):#,chunksize=chunksize):
+                        max_chunksize=10
+                        chunksize=min(int(np.ceil(len(pathList)/self.processes)),max_chunksize)
+                        for out in pool.imap(partial(Parser.readFile),pathList.items(),chunksize=chunksize):
                             pb.step()
                             self.mergeStats(out)
                         pool.close()
@@ -297,7 +298,7 @@ class eddyProAPI():
                     for i, (timestamp,file) in enumerate(pathList.items()):
                         if i < self.testSet or self.testSet == 0:
                             T2 = time.time()
-                            out = self.Parser.readFile((timestamp,file))
+                            out = Parser.readFile((timestamp,file))
                             self.mergeStats(out)
                         if self.debug == True:
                             print(f'{file} complete, time elapsed:git ',np.round(time.time()-T2,3)) 
@@ -326,6 +327,7 @@ class eddyProAPI():
         df = pd.read_csv(self.metaDataUpdates,header=[0,1])
         df[('TIMESTAMP','Start')] = pd.to_datetime(df[('TIMESTAMP','Start')])
         df[('TIMESTAMP','End')] = pd.to_datetime(df[('TIMESTAMP','End')])
+        print(self.metaDataValues.index.dtype)
         df[('TIMESTAMP','End')] = df[('TIMESTAMP','End')].fillna(self.metaDataValues.index.max())
         for i,row in df.iterrows():
             for col in row.index:
@@ -366,7 +368,8 @@ class eddyProAPI():
         # Get statistics for tracked values by group
         self.metaDataValues[tracker] = self.metaDataValues[tracker].astype('float')
         track_cols = [self.groupID]+tracker
-        self.configurationGroups = self.metaDataValues[track_cols].groupby(by=self.groupID).agg(self.Parser.agg)
+        agg = [key for key, value in self.config['monitoringInstructions']['dataAggregation'].items() if value is True]
+        self.configurationGroups = self.metaDataValues[track_cols].groupby(by=self.groupID).agg(agg)
         group_cols = [self.groupID]+grouper
         self.configurationGroups = self.configurationGroups.join(self.metaDataValues[group_cols].groupby(by=self.groupID).agg(['first','count']))
         pass_cols = [self.groupID]+passer
