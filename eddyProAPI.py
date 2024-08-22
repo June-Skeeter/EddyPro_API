@@ -151,17 +151,15 @@ class eddyProAPI():
         
         # Read the existing metadata from a previous run if they exist
         read_files = {key:value for key,value in self.config['metadataFiles'].items() if value['filepath_or_buffer'].startswith('f"')==False}
-        if sum([os.path.isfile(value['filepath_or_buffer']) for value in read_files.values()]) == len(read_files):
-            # Some metadata need their dtypes explicitly specified when reading .csv files all others treated as "objects"
-            dtypes = defaultdict(lambda:'object',groupID='int')
-            for category, dtype in {'groupBy':'string','track':'float','pass':'string'}.items():
-                for key,value in self.config['monitoringInstructions']['metaData'][category].items():
-                    for val in value:
-                        dtypes[(key,val)]=dtype
-            for key,value in read_files.items():
+        dtypes = defaultdict(lambda:'object',groupID='int')
+        for category, dtype in {'groupBy':'string','track':'float','pass':'string'}.items():
+            for key,value in self.config['monitoringInstructions']['metaData'][category].items():
+                for val in value:
+                    dtypes[(key,val)]=dtype
+        for key,value in read_files.items():
+            if os.path.isfile(value['filepath_or_buffer']):
                 setattr(self, key,(pd.read_csv(dtype=dtypes,**value)))
-        else:
-            for key in read_files.keys():
+            else:
                 setattr(self, key,pd.DataFrame())            
 
     def resetInventory(self):
@@ -277,7 +275,9 @@ class eddyProAPI():
             ),'source'].copy()
         # Call file handler to parse files in parallel (default) or sequentially for troubleshooting
         byMonth = to_process.resample('MS').count()
+
         for m,v in byMonth.items():
+            T2 = time.time()
             if v >0:
                 print(f"{m.year}-{m.month}")
                 pathList = to_process.loc[((to_process.index.year == m.year)&(to_process.index.month == m.month))]
@@ -304,7 +304,8 @@ class eddyProAPI():
                 
                 self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
                 self.metaDataValues.to_csv(self.config['metaDataValues'])
-        print('Reading Complete, time elapsed: ',np.round(time.time()-T1,3))
+            print(f"{m.year}-{m.month} complete in : ",np.round(time.time()-T2,3))
+        print('Reading Complete, total time elapsed: ',np.round(time.time()-T1,3))
 
     def mergeStats(self,out):
         if out[0] is not None:
@@ -517,8 +518,8 @@ class eddyProAPI():
         mainTime = time.time()
         self.setupGroups()
         print(self.processes)
-        # self.runGroups()
-        # self.copyFinalOutputs()
+        self.runGroups()
+        self.copyFinalOutputs()
         print(f"runEP complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
 
     def setupGroups(self):
