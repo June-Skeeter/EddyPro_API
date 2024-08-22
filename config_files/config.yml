@@ -200,7 +200,7 @@ monitoringInstructions:
     median: False
     max: True
     min: True
-    count: True
+    count: False
 
   dataExclude:
   - RECORD
