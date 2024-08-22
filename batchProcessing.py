@@ -4,6 +4,7 @@
 import os
 import re
 import sys
+import psutil
 import shutil
 import zipfile
 import datetime
@@ -13,13 +14,14 @@ import numpy as np
 import pandas as pd
 import configparser
 from io import TextIOWrapper
-import readLiConfigFiles as rLCF
-# import xml.etree.ElementTree as ET
-# from HelperFunctions import EventLog as eL
 importlib.reload(rLCF)
 
+def set_high_priority():
+    p = psutil.Process(os.getpid())
+    p.nice(psutil.HIGH_PRIORITY_CLASS)
 
-def pasteWithSubprocess(source, dest, option = 'copy',Verbose=False):    
+def pasteWithSubprocess(source, dest, option = 'copy',Verbose=False):
+    set_high_priority()
     cmd=None
     if sys.platform.startswith("darwin"): 
         # These need to be tested/flushed out
@@ -75,6 +77,7 @@ class Parser():
             self.fileDescription.update(self.config['dat'])
 
     def readFile(self,file):
+        set_high_priority()
         timestamp=file[0]
         filepath=file[1]
         if filepath.endswith('.ghg'):
@@ -82,7 +85,7 @@ class Parser():
                 d_agg,metaData = self.extractGHG(filepath,timestamp)
             except Exception as e:
                 print(f"extraction failed for: {filepath}")
-                print(e)
+                # print(e)
                 d_agg,metaData=None,None
                 pass
         else:
