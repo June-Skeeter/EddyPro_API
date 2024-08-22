@@ -327,7 +327,6 @@ class eddyProAPI():
         df = pd.read_csv(self.metaDataUpdates,header=[0,1])
         df[('TIMESTAMP','Start')] = pd.to_datetime(df[('TIMESTAMP','Start')])
         df[('TIMESTAMP','End')] = pd.to_datetime(df[('TIMESTAMP','End')])
-        print(self.metaDataValues.index.dtype)
         df[('TIMESTAMP','End')] = df[('TIMESTAMP','End')].fillna(self.metaDataValues.index.max())
         for i,row in df.iterrows():
             for col in row.index:
