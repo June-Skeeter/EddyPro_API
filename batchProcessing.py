@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import configparser
 from io import TextIOWrapper
+import readLiConfigFiles as rLCF
 importlib.reload(rLCF)
 
 def set_high_priority():
@@ -105,12 +106,14 @@ class Parser():
             # Get all possible contents of ghg file, for now only concerned with .data and .metadata, can expand to biomet and config/calibration files later
             for f in subFiles:
                 ghgInventory[f.replace(base,'')]=f
-            metaData,fileDescription = self.readMetaData(TextIOWrapper(ghgZip.open(ghgInventory['.metadata']), 'utf-8'))
+            with ghgZip.open(ghgInventory['.metadata']) as f:
+                metaData,fileDescription = self.readMetaData(TextIOWrapper(f, 'utf-8'))
             fileDescription.update(self.config['ghg'])
             if hasattr(fileDescription, 'skip_rows') == False:
                 fileDescription['skip_rows'] = int(fileDescription['header_rows'])-1
                 fileDescription['header_rows'] = [0]
-            d_agg, d_names = self.readData(ghgZip.open(ghgInventory['.data']),fileDescription,timestamp)
+            with ghgZip.open(ghgInventory['.data']) as f:
+                d_agg, d_names = self.readData(f,fileDescription,timestamp)
             metaData.update(d_names)
         return(d_agg,metaData)
 
