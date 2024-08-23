@@ -38,11 +38,11 @@ def pasteWithSubprocess(source, dest, option = 'copy',Verbose=False):
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     if Verbose==True:
         print(proc)
-# Copy ghg or dat files and shift timestamp in file name if needed
-# useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
-# Called from preProcessing module, defined here to allow copying to be done in parallel
-# Compares against existing data to avoid re-copying files
-# if dateRange provided, will limit to files within the range
+    # Copy ghg or dat files and shift timestamp in file name if needed
+    # useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
+    # Called from preProcessing module, defined here to allow copying to be done in parallel
+    # Compares against existing data to avoid re-copying files
+    # if dateRange provided, will limit to files within the range
 
 def findFiles(inName,in_dir,fileInfo,checkList=[],dateRange=None):
     # return empty list if 
@@ -163,6 +163,7 @@ class Parser():
         # Generate the aggregation statistics, but only for numeric columns
         data = data._get_numeric_data()
         data = data.loc[:,[c for c in data.columns if c not in self.config['monitoringInstructions']['dataExclude']]]
+        data.replace([np.inf, -np.inf], np.nan, inplace=True)
         d_agg = data.agg(self.agg)
         d_agg['Timestamp'] = timestamp
         d_agg.set_index('Timestamp', append=True, inplace=True)

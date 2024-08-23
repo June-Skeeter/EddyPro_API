@@ -41,7 +41,7 @@ defaultArgs = {
     'eddyProDynamicConfig':'config_files/eddyProDynamicConfig.ini',
     'GHG_Metadata_Template':'config_files/GHG_Metadata_Template.metadata',
     'metaDataTemplate':'None',
-    'processes':os.cpu_count()-1,
+    'processes':os.cpu_count()-2,
     'priority':'normal',
     'debug':False,
     'testSet':0,
@@ -519,7 +519,6 @@ class eddyProAPI():
     def runEP(self):
         mainTime = time.time()
         self.setupGroups()
-        print(self.processes)
         self.runGroups()
         self.copyFinalOutputs()
         print(f"runEP complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
@@ -729,12 +728,10 @@ if __name__ == '__main__':
         elif dt == type([]):
             nargs = '+'
             dt = type('')
-        
         CLI.add_argument(f"--{key}",nargs=nargs,type=dt,default=val)
 
     # parse the command line
     args = CLI.parse_args()
-
     kwargs = vars(args)
     for d in dictArgs:
         kwargs[d] = json.loads(kwargs[d])

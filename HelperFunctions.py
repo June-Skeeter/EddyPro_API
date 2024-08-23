@@ -16,7 +16,8 @@ def queryBiometDatabase(siteID,outputPath,biometPath,database,dateRange):
         database=database,
         tasks=createAuxilaryData,
         stage='Second',
-        dateRange=dateRange)
+        dateRange=dateRange,
+        nameTimeStamp=False)
     return(auxilaryDpaths)
 
 def dumpToBiometDatabase(siteID,biometPath,database,inputFile,metaData,stage,tag=''):
