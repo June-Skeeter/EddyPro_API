@@ -260,6 +260,9 @@ class eddyProAPI():
         # Sort so that oldest files get processed first
         self.fileInventory = self.fileInventory.sort_index()#ascending=False)
         # Save inventory
+        if 'groupID' in self.fileInventory.columns:
+            self.fileInventory['groupID'] = self.fileInventory['groupID'].replace({self.config['stringTags']['NaN']:self.config['intNA']})
+            self.fileInventory['groupID'] = self.fileInventory['groupID'].astype(int)
         self.fileInventory.to_csv(self.config['fileInventory'])
         print('Files Search Complete, time elapsed: ',np.round(time.time()-T1,3))
     
@@ -309,6 +312,7 @@ class eddyProAPI():
         print('Reading Complete, total time elapsed: ',np.round(time.time()-T1,3))
 
     def mergeStats(self,out):
+        T1 = time.time()
         if out[0] is not None:
             for i,o in enumerate(out):
                 # Fill any "missing" column levels
@@ -322,6 +326,7 @@ class eddyProAPI():
                     self.rawDataStatistics = pd.concat([self.rawDataStatistics,o])
                 elif i == 1:
                     self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
+        print(np.round(time.time()-T1,2))
     
     def usermetaDataUpdates(self):
         df = pd.read_csv(self.metaDataUpdates,header=[0,1])
