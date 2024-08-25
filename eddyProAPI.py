@@ -313,25 +313,27 @@ class eddyProAPI():
         T1 = time.time()
         if out is None:
             for key,df in self.tempStats():
-                if key == 0: self.rawDataStatistics = pd.concat([self.rawDataStatistics,df])
-                elif key == 1:self.metaDataValues = pd.concat([self.metaDataValues,df])
+                if key == 1: self.rawDataStatistics = pd.concat([self.rawDataStatistics,df])
+                elif key == 2:self.metaDataValues = pd.concat([self.metaDataValues,df])
                 self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
                 self.metaDataValues.to_csv(self.config['metaDataValues'])
-        elif type(out) is int:
+        elif type(out) == type(1):
             self.tempStats = {}
-            for i in out:
-                self.tempStats[i] = pd.DataFrame()
-        elif out[0] is not None:
+            for i in range(out):
+                self.tempStats[i+1] = pd.DataFrame()
+        elif out[1] is not None:
             for i,o in enumerate(out):
-                # Fill any "missing" column levels
-                cols = o.columns
-                nuCols = []
-                for c in cols:
-                    c = [a if a != '' else self.config['stringTags']['NaN'] for a in c]
-                    nuCols.append(tuple(c))
-                o.columns = pd.MultiIndex.from_tuples(nuCols)
-                self.tempStats[i] = pd.concat([self.rawDataStatistics,o])
-        print(np.round(time.time()-T1,2))
+                if i > 0:
+                    # Fill any "missing" column levels
+                    cols = o.columns
+                    nuCols = []
+                    for c in cols:
+                        c = [a if a != '' else self.config['stringTags']['NaN'] for a in c]
+                        nuCols.append(tuple(c))
+                    o.columns = pd.MultiIndex.from_tuples(nuCols)
+                    self.tempStats[i] = pd.concat([self.rawDataStatistics,o])
+            if self.debug == True:
+                print(out[0],np.round(time.time()-T1,2))
     
     def usermetaDataUpdates(self):
         df = pd.read_csv(self.metaDataUpdates,header=[0,1])

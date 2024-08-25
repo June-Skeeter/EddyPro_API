@@ -96,7 +96,7 @@ class Parser():
         
         metaData = pd.DataFrame(metaData,index=[timestamp])
         metaData.index.name = 'TIMESTAMP'
-        return(d_agg,metaData)
+        return(os.getpid(),d_agg,metaData)
 
     def extractGHG(self,filepath,timestamp):
         base = os.path.basename(filepath).rstrip('.ghg')
