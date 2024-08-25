@@ -71,6 +71,7 @@ class Parser():
     def __init__(self,config,metaDataTemplate='None',verbose=False):
         self.config = config
         self.verbose = verbose
+        self.nOut = 2
         # Define statistics to aggregate raw data by, see configuration
         self.agg = [key for key, value in self.config['monitoringInstructions']['dataAggregation'].items() if value is True]
         if metaDataTemplate != 'None':
@@ -86,7 +87,6 @@ class Parser():
                 d_agg,metaData = self.extractGHG(filepath,timestamp)
             except Exception as e:
                 print(f"extraction failed for: {filepath}")
-                # print(e)
                 d_agg,metaData=None,None
                 pass
         else:

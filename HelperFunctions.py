@@ -11,7 +11,7 @@ def queryBiometDatabase(siteID,outputPath,biometPath,database,dateRange):
     sys.path.remove(os.path.abspath(biometPath+'/Python'))
     createAuxilaryData = os.path.abspath(wd+'/config_files/BiometDataFileTemplate.yml')
     auxilaryDpaths=cfb.makeCSV(
-        siteID,
+        siteID=siteID,
         outputPath=outputPath,
         database=database,
         tasks=createAuxilaryData,

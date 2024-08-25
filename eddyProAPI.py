@@ -284,6 +284,7 @@ class eddyProAPI():
             T2 = time.time()
             if v >0:
                 print(f"{m.year}-{m.month}")
+                self.mergeStats(out=Parser.nOut)
                 pathList = to_process.loc[((to_process.index.year == m.year)&(to_process.index.month == m.month))]
                 if (__name__ == 'eddyProAPI' or __name__ == '__main__') and self.processes>1:
                     # run routine in parallel
@@ -305,15 +306,22 @@ class eddyProAPI():
                             self.mergeStats(out)
                         if self.debug == True:
                             print(f'{file} complete, time elapsed:git ',np.round(time.time()-T2,3)) 
-                
-                self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
-                self.metaDataValues.to_csv(self.config['metaDataValues'])
             print(f"{m.year}-{m.month} complete in : ",np.round(time.time()-T2,3))
         print('Reading Complete, total time elapsed: ',np.round(time.time()-T1,3))
 
-    def mergeStats(self,out):
+    def mergeStats(self,out=None):
         T1 = time.time()
-        if out[0] is not None:
+        if out is None:
+            for key,df in self.tempStats():
+                if key == 0: self.rawDataStatistics = pd.concat([self.rawDataStatistics,df])
+                elif key == 1:self.metaDataValues = pd.concat([self.metaDataValues,df])
+                self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
+                self.metaDataValues.to_csv(self.config['metaDataValues'])
+        elif type(out) is int:
+            self.tempStats = {}
+            for i in out:
+                self.tempStats[i] = pd.DataFrame()
+        elif out[0] is not None:
             for i,o in enumerate(out):
                 # Fill any "missing" column levels
                 cols = o.columns
@@ -322,10 +330,7 @@ class eddyProAPI():
                     c = [a if a != '' else self.config['stringTags']['NaN'] for a in c]
                     nuCols.append(tuple(c))
                 o.columns = pd.MultiIndex.from_tuples(nuCols)
-                if i == 0:
-                    self.rawDataStatistics = pd.concat([self.rawDataStatistics,o])
-                elif i == 1:
-                    self.metaDataValues = pd.concat([self.metaDataValues,out[1]])
+                self.tempStats[i] = pd.concat([self.rawDataStatistics,o])
         print(np.round(time.time()-T1,2))
     
     def usermetaDataUpdates(self):
