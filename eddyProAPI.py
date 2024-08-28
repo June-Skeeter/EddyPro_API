@@ -32,7 +32,7 @@ os.chdir(dname)
 
 # Default arguments
 defaultArgs = {
-    'runMode':'full',
+    'runMode':'3',
     'siteID':'SomeSite',
     'sourceDir':[],
     'dateRange':[date(datetime.now().year,1,1).strftime("%Y-%m-%d"),datetime.now().strftime("%Y-%m-%d")],
@@ -75,10 +75,12 @@ class eddyProAPI():
             setattr(self, k, v)
 
         self.setup()
-        if self.runMode != '2':
-            self.preProcessing()
-        if self.runMode != '1':
-            self.runEP()
+        self.runMode = int(self.runMode)
+        if self.runMode > 0:
+            if self.runMode <= 2:
+                self.preProcessing()
+            if self.runMode >= 2:
+                self.runEP()
 
     def setup(self):
         # Task common between the two modules
@@ -261,7 +263,7 @@ class eddyProAPI():
         self.fileInventory = self.fileInventory.sort_index()#ascending=False)
         # Save inventory
         if 'groupID' in self.fileInventory.columns:
-            self.fileInventory['groupID'] = self.fileInventory['groupID'].replace({self.config['stringTags']['NaN']:self.config['intNA']})
+            self.fileInventory['groupID'] = self.fileInventory['groupID'].replace({self.config['stringTags']['NaN']:self.config['intNaN']})
             self.fileInventory['groupID'] = self.fileInventory['groupID'].astype(int)
         self.fileInventory.to_csv(self.config['fileInventory'])
         print('Files Search Complete, time elapsed: ',np.round(time.time()-T1,3))
@@ -306,13 +308,14 @@ class eddyProAPI():
                             self.mergeStats(out)
                         if self.debug == True:
                             print(f'{file} complete, time elapsed:git ',np.round(time.time()-T2,3)) 
+            self.mergeStats()
             print(f"{m.year}-{m.month} complete in : ",np.round(time.time()-T2,3))
         print('Reading Complete, total time elapsed: ',np.round(time.time()-T1,3))
 
     def mergeStats(self,out=None):
         T1 = time.time()
         if out is None:
-            for key,df in self.tempStats():
+            for key,df in self.tempStats.items():
                 if key == 1: self.rawDataStatistics = pd.concat([self.rawDataStatistics,df])
                 elif key == 2:self.metaDataValues = pd.concat([self.metaDataValues,df])
                 self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
@@ -331,7 +334,7 @@ class eddyProAPI():
                         c = [a if a != '' else self.config['stringTags']['NaN'] for a in c]
                         nuCols.append(tuple(c))
                     o.columns = pd.MultiIndex.from_tuples(nuCols)
-                    self.tempStats[i] = pd.concat([self.rawDataStatistics,o])
+                    self.tempStats[i] = pd.concat([self.tempStats[i],o])
             if self.debug == True:
                 print(out[0],np.round(time.time()-T1,2))
     
@@ -363,7 +366,7 @@ class eddyProAPI():
                    for key,value in self.config['monitoringInstructions']['metaData']['pass'].items() 
                    if key in self.metaDataValues.columns.get_level_values(0)
                    for val in value
-                   for v in fnmatch.filter(self.metaDataValues[key].columns,val)]  
+                   for v in fnmatch.filter(self.metaDataValues[key].columns,val)]
         self.metaDataValues[grouper+passer] = self.metaDataValues[grouper+passer].fillna(self.config['stringTags']['NaN'])
         self.metaDataValues[grouper+passer] = self.metaDataValues[grouper+passer].replace('',self.config['stringTags']['NaN'])
         # Generate group labels based off unique configurations of groupBy values
@@ -397,7 +400,7 @@ class eddyProAPI():
         if gcol in self.fileInventory:
             self.fileInventory = self.fileInventory.drop(columns=gcol)
         self.fileInventory = self.fileInventory.join(groupLabels)
-        self.fileInventory[gcol]=self.fileInventory[gcol].fillna(self.config['intNA']).astype(np.int32)
+        self.fileInventory[gcol]=self.fileInventory[gcol].fillna(self.config['intNaN']).astype(np.int32)
         # Add the file_prototype template to the configuration groups
         self.makeMetadataFiles()
         self.filterData()        
@@ -487,10 +490,13 @@ class eddyProAPI():
     def filterData(self):
         print("Applying Filters:")
         # Alias to simplify eval statement definitions
-        Data = self.rawDataStatistics.astype('float')
+        
+        Data = self.rawDataStatistics.loc[
+            (self.rawDataStatistics.index>=self.dateRange.min())&(self.rawDataStatistics.index<=self.dateRange.max())].astype('float')
         self.fileInventory['Filter Flags'] = self.config['stringTags']['NaN']
         for name,rule in self.config['monitoringInstructions']['dataFilters'].items():
             print(name,':')
+            nfilt = 0
             for condition,parameters in rule.items():
                 print(condition)
                 # Identify data columns corresponding to desired variable *or* measurement type
@@ -513,13 +519,15 @@ class eddyProAPI():
                         if self.config['stringTags']['NaN'] not in h:
                             test = eval(filter).max(axis=1)
                             flag = test[test==True].index
-                            print(stat,'variables',h,'criteria',filter)
-                            print('nfiltered: ',flag.shape[0])
+                            # print(stat,'variables',h,'criteria',filter)
+                            # print('nfiltered: ',flag.shape[0])
+                            nfilt+=flag.shape[0]
                             # Add a filter flag to exclude timestamps from EddyPro runs and list the corresponding exclusion condition
                             self.fileInventory.loc[flag.values,'Filter Flags'] = (self.fileInventory.loc[flag.values,'Filter Flags'].str.replace(self.config['stringTags']['NaN'],'')+f',{name}: {condition}').str.lstrip(',')
                         else:
                             self.fileInventory.loc[self.fileInventory['groupID']==groupID,'Filter Flags'] = (self.fileInventory.loc[self.fileInventory['groupID']==groupID,'Filter Flags'].str.replace(self.config['stringTags']['NaN'],'')+f',{name}: Data not available').str.lstrip(',')
-        self.fileInventory.loc[self.fileInventory['Filter Flags'] != self.config['stringTags']['NaN'],'groupID'] = self.config['intNA']
+                print(nfilt)
+        self.fileInventory.loc[self.fileInventory['Filter Flags'] != self.config['stringTags']['NaN'],'groupID'] = self.config['intNaN']
 
     def saveMetadataFiles(self):
         # Save the revised inventory

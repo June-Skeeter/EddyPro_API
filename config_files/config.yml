@@ -58,7 +58,7 @@ stringTags:
   NaN: '~'
   exclude: _Exclude_
   groupID: f"group_{groupID}_"
-intNA: -9999
+intNaN: -9999
 assumeDefaultNAs:
 - -9999
 
@@ -232,13 +232,13 @@ monitoringInstructions:
         measure_type:
         filters:
           # This will flag anything with a mean flowrate < 10 lpm
-          mean: Data.loc[groupIX,variables]<10
+          mean: Data.loc[groupIX,variables]<5
       condition_2:
         variables:
         - avg_signal_strength_7200
         measure_type:
         filters:
-          mean: Data.loc[groupIX,variables]<90
+          mean: Data.loc[groupIX,variables]<60
 
 eddyProGroupDefs:
   # Template for identifying relevant data file columns (by index #) for dumping into .eddypro files
