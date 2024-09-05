@@ -76,7 +76,7 @@ class Parser():
         self.agg = [key for key, value in self.config['monitoringInstructions']['dataAggregation'].items() if value is True]
         if metaDataTemplate != 'None':
             self.metaDataTemplate,self.fileDescription = self.readMetaData(open(metaDataTemplate))
-            self.fileDescription.update(self.config['dat'])
+            self.fileDescription.update(self.config['dat']['fileDescription'])
 
     def readFile(self,file):
         set_high_priority()
@@ -93,6 +93,11 @@ class Parser():
             d_agg, d_names = self.readData(filepath,self.fileDescription,timestamp)
             metaData = self.metaDataTemplate.copy()
             metaData.update(d_names)
+        
+        # Ignore missing data
+        if len(self.ignore)>0:
+            for i in self.ignore:
+                metaData[('FileDescription',f'col_{i}_variable')]='ignore'
         
         metaData = pd.DataFrame(metaData,index=[timestamp])
         metaData.index.name = 'TIMESTAMP'
@@ -137,10 +142,8 @@ class Parser():
         # parse the column names and output desired aggregation statistics for each raw data file
         if 'na_values' in fileDescription.keys():
             data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
-        elif 'assumeDefaultNAs' in self.config.keys() and len(self.config['assumeDefaultNAs'])>0:
-            data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=self.config['assumeDefaultNAs'])
         else:
-            data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'])
+            data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=self.config['intNaN'])
         if fileDescription['data_label'] != 'Not set':
             # .ghg data files contain a "DATA" label if first column which isn't needed
             data = data.drop(data.columns[0],axis=1)
@@ -155,13 +158,18 @@ class Parser():
                 if self.verbose == True:
                     print(f'Dropped NaN columns in {dataFile.name} to force metadata match')
                 pass
-        data = data.dropna(how='all',axis=1)
+        D1 = data.columns[data.isna().all()].tolist()
+        self.ignore = [i+1 for i,c in enumerate(data.columns) if c in D1]
+        # data = data.dropna(how='all',axis=1)
+        # D2 = data.columns[data.isna().all()].tolist()
+        # print([d for d in D1 if d not in D2])
         # generate dict of column names to add back into Metadata
         col_names = {}
         for i,c in enumerate(data.columns.get_level_values(0)):
             col_names[('Custom',f'col_{i+1}_header_name')] = c
         # Generate the aggregation statistics, but only for numeric columns
         data = data._get_numeric_data()
+        d_agg = data.agg(self.agg)
         data = data.loc[:,[c for c in data.columns if c not in self.config['monitoringInstructions']['dataExclude']]]
         data.replace([np.inf, -np.inf], np.nan, inplace=True)
         d_agg = data.agg(self.agg)

@@ -51,20 +51,20 @@ def instrumentSeparation(northOffset,u,v):
 # substitute keys in a path with corresponding path_strings from a class object 
 # remove from the path if it doesn't exist
 
-def sub_path(class_dict,path_string):
+# def sub_path(class_dict,path_string):
 
-    for i in range(3):
-        for sub in class_dict.keys():
-            try:
-                path_string = path_string.replace(f'**{sub}**',f'{class_dict[sub]}')#.replace('None','')
-            except:
-                pass
-                path_string = path_string.replace(f'**{sub}**','')
+#     for i in range(3):
+#         for sub in class_dict.keys():
+#             try:
+#                 path_string = path_string.replace(f'**{sub}**',f'{class_dict[sub]}')
+#             except:
+#                 pass
+#                 path_string = path_string.replace(f'**{sub}**','')
     
-    path_string = path_string.replace('//','/')
-    path_string = path_string.replace('\\\\','\\')
+#     path_string = path_string.replace('//','/')
+#     path_string = path_string.replace('\\\\','\\')
 
-    return(path_string)
+#     return(path_string)
 
 ## Progress bar to update status of a run
 class progressbar():

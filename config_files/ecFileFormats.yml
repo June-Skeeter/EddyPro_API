@@ -1,0 +1,20 @@
+ghg:
+  extension: 'ghg'
+  # Regex search for dates in filename
+  search: '([0-9]{4}\-[0-9]{2}\-[0-9]{2}T[0-9]{6})'
+  format: '%Y-%m-%dT%H%M%S'
+  ep_date_pattern: yyyy-mm-ddTHHMM??
+
+dat:
+  extension: 'dat'
+  search: ([0-9]{4}\_[0-9]{2}\_[0-9]{2}\_[0-9]{4})
+  format: '%Y_%m_%d_%H%M'
+  ep_date_pattern: yyyy_mm_dd_HHMM
+  fileDescription:
+    # Kwargs for reading data
+    na_values: 
+    - NAN
+    # rows to skip (start count form 0)
+    skip_rows: [0,3]
+    # header rows (after)
+    header_rows: [0,1]

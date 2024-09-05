@@ -46,7 +46,7 @@ defaultArgs = {
     'debug':False,
     'testSet':0,
     'reset':False,
-    'name':'TestRun',
+    'name':'batchRun',
     'biometData':'None',
     'dynamicMetadata':'None',
     'userDefinedEddyProSettings':{},
@@ -107,6 +107,8 @@ class eddyProAPI():
         # Read yaml configurations        
         with open('config_files/config.yml') as yml:
             self.config = yaml.safe_load(yml)
+        with open('config_files/ecFileFormats.yml') as yml:
+            self.config.update(yaml.safe_load(yml))
         self.config['siteID'] = self.siteID
         groupID = '\d+'
         self.genericID = eval(self.config['stringTags']['groupID'])
@@ -160,7 +162,6 @@ class eddyProAPI():
                     dtypes[(key,val)]=dtype
         for key,value in read_files.items():
             if os.path.isfile(value['filepath_or_buffer']):
-                print(value['filepath_or_buffer'])
                 setattr(self, key,(pd.read_csv(dtype=dtypes,**value)))
             else:
                 setattr(self, key,pd.DataFrame())            
@@ -168,11 +169,10 @@ class eddyProAPI():
     def resetInventory(self):
         RESET = input(f"WARNING!! You are about to complete a reset:\ntype RESET to continue, provide any other input + enter to exit the application \n\n")
         if RESET.upper() == 'RESET':
+            print(f"Deleting contents of :\n{self.config['Paths']['metaDir']}\n{self.config['Paths']['outputDir']}")
             if os.path.isdir(self.config['Paths']['metaDir']):
-                print(f"Deleting contents of : {self.config['Paths']['metaDir']}")
                 shutil.rmtree(self.config['Paths']['metaDir'])
             if os.path.isdir(self.config['Paths']['outputDir']):
-                print(f"Deleting contents of : {self.config['Paths']['outputDir']}")
                 shutil.rmtree(self.config['Paths']['outputDir'])
         else:
             sys.exit('Quitting')
@@ -184,7 +184,6 @@ class eddyProAPI():
         if self.metaDataUpdates != 'None':
             print('Applying Manual Metadata Adjustments')
             self.usermetaDataUpdates() 
-            print('Manual Metadata Adjustments Complete')
         self.groupAndFilter()
         print(f"Pre-Processing complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
         
@@ -238,7 +237,7 @@ class eddyProAPI():
                         for i,filename in enumerate(fileList):
                             if self.debug == False or i < self.testSet + testOffset or self.testSet == 0:
                                 out = batchProcessing.findFiles(filename,dir,fileInfo=fileInfo,dateRange=self.dateRange)
-                                if out[0] is None and self.testSet > 0:
+                                if out[1] is None and self.testSet > 0:
                                     testOffset += 1
                                 dout.append(out)
                     # Dump results to inventory
@@ -316,7 +315,8 @@ class eddyProAPI():
         T1 = time.time()
         if out is None:
             for key,df in self.tempStats.items():
-                if key == 1: self.rawDataStatistics = pd.concat([self.rawDataStatistics,df])
+                if key == 1: 
+                    self.rawDataStatistics = pd.concat([self.rawDataStatistics,df])
                 elif key == 2:self.metaDataValues = pd.concat([self.metaDataValues,df])
                 self.rawDataStatistics.to_csv(self.config['rawDataStatistics'])
                 self.metaDataValues.to_csv(self.config['metaDataValues'])
@@ -393,9 +393,7 @@ class eddyProAPI():
         if groupLabels.columns[0] in self.rawDataStatistics:
             self.rawDataStatistics = self.rawDataStatistics.drop(columns=groupLabels.columns[0])
         self.rawDataStatistics = self.rawDataStatistics.join(groupLabels)
-        print(groupLabels.columns)
         groupLabels.columns=[(''.join(col)).replace(self.config['stringTags']['NaN'],'') for col in groupLabels.columns]
-        print(groupLabels.columns)
         gcol = groupLabels.columns[0]
         if gcol in self.fileInventory:
             self.fileInventory = self.fileInventory.drop(columns=gcol)
@@ -412,7 +410,7 @@ class eddyProAPI():
 
     def makeMetadataFiles(self):
         # Creates two files
-        #   1) A .metadata file representative of all non-dynamic (e.g., canopy height) values
+        #   1) A .metadata file representative of all non-dynamic values
         #   2) A .eddypro file representing the relevant column numbers in the .dat(a) files
         print('Writing Metadata Files')
         eddyProGroupDefsTemplate={'Project':{}} 
@@ -453,7 +451,7 @@ class eddyProAPI():
                         nkey = key.replace('*',str(i+1))
                         if nkey in groupMetaData[section]:
                             metaDataFile[section][nkey] = groupMetaData[section][nkey]
-            filename = self.config['Paths']['metaDir']+eval(self.config['groupFiles']['groupMetaData'])
+            filename = self.config['Paths']['metaDir']+'/'+eval(self.config['groupFiles']['groupMetaData'])
             with open(filename, 'w') as groupMetaData:
                 groupMetaData.write(';GHG_METADATA\n')
                 cfg = configparser.ConfigParser()
@@ -482,7 +480,8 @@ class eddyProAPI():
             eddyProCols = configparser.ConfigParser()
             eddyProCols.read_dict(eddyProGroupDefs)
             # Save the run and append to the list of runs
-            filename = self.config['Paths']['metaDir']+eval(self.config['groupFiles']['eddyProCols'])
+            filename = self.config['Paths']['metaDir']+'/'+eval(self.config['groupFiles']['eddyProCols'])
+            print(filename)
             with open(filename, 'w') as eddypro:
                 eddypro.write(';EDDYPRO_PROCESSING\n')
                 eddyProCols.write(eddypro,space_around_delimiters=False)
@@ -519,8 +518,6 @@ class eddyProAPI():
                         if self.config['stringTags']['NaN'] not in h:
                             test = eval(filter).max(axis=1)
                             flag = test[test==True].index
-                            # print(stat,'variables',h,'criteria',filter)
-                            # print('nfiltered: ',flag.shape[0])
                             nfilt+=flag.shape[0]
                             # Add a filter flag to exclude timestamps from EddyPro runs and list the corresponding exclusion condition
                             self.fileInventory.loc[flag.values,'Filter Flags'] = (self.fileInventory.loc[flag.values,'Filter Flags'].str.replace(self.config['stringTags']['NaN'],'')+f',{name}: {condition}').str.lstrip(',')
@@ -699,12 +696,10 @@ class eddyProAPI():
                         kwargs['parse_dates'] = {key:val}
                     for i,fn in enumerate(toMerge):
                         Temp = pd.concat([Temp,pd.read_csv(fn,**kwargs)])
-                    print(self.config['rpIntermediary'].items())
                     Temp = Temp.set_index(list(kwargs['parse_dates'].keys())[0]).sort_index()
                     Temp = Temp.sort_index()
                     fn = [f for f in self.ex_fileList if id in f][0].replace('fluxnet',filePattern)
-                    print('Saving As')
-                    print(fn)
+                    print('Saving As \n',fn)
                     Temp.to_csv(fn,index=False)
 
     def copyFinalOutputs(self):
@@ -728,7 +723,7 @@ class eddyProAPI():
                                         database = self.config['BiometUser']['Database'],
                                         inputFile=f"{d_out}/{td}",
                                         metaData=metaData,
-                                        stage='epAutoRun',
+                                        stage='epOutputs',
                                         tag=self.name)
 
 # If called from command line ...
