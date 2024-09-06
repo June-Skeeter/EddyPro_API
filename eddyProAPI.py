@@ -547,7 +547,7 @@ class eddyProAPI():
         if self.debug == False and os.path.isdir(self.tempDir):
             shutil.rmtree(self.tempDir)
             os.mkdir(self.tempDir)
-            with open(self.tempDir+'.gitignore', 'w') as ig:
+            with open(self.tempDir+'/.gitignore', 'w') as ig:
                 ig.write('*')
         elif os.path.isdir(self.tempDir) == False:
             os.mkdir(self.tempDir)
