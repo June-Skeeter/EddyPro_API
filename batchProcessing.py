@@ -98,6 +98,7 @@ class Parser():
         if len(self.ignore)>0:
             for i in self.ignore:
                 metaData[('FileDescription',f'col_{i}_variable')]='ignore'
+                metaData[('FileDescription',f'col_{i}_instrument')]=''
         
         metaData = pd.DataFrame(metaData,index=[timestamp])
         metaData.index.name = 'TIMESTAMP'
@@ -212,6 +213,7 @@ class runEddyPro():
             os.path.abspath(f'{bin}/rp_processing_log.txt'),
             os.path.abspath(toRun.replace('.eddypro','_log.txt'))
         )
+
         if self.debug == False:
             shutil.rmtree(dpth)
         return(os.path.split(bin)[0])
