@@ -57,6 +57,7 @@ defaultArgs = {
     'metaDataUpdates':'None',
     'lowMemory':True,
     }
+
 class eddyProAPI():
     def __init__(self,**kwargs):
         os.chdir(dname)
@@ -255,7 +256,7 @@ class eddyProAPI():
         if self.fileInventory.empty:
             sys.exit('No Data Found')
         # Resample to get timestamp on consistent half-hourly intervals
-        self.fileInventory = self.fileInventory.resample('30T').first()
+        self.fileInventory = self.fileInventory.resample('30min').first()
         # Fill empty string columns
         self.fileInventory = self.fileInventory.fillna(self.config['stringTags']['NaN'])
         # Sort so that oldest files get processed first
@@ -537,7 +538,8 @@ class eddyProAPI():
         mainTime = time.time()
         self.setupGroups()
         self.runGroups()
-        self.copyFinalOutputs()
+        if self.debug == False:
+            self.copyFinalOutputs()
         print(f"runEP complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
 
     def setupGroups(self):
@@ -625,7 +627,7 @@ class eddyProAPI():
             full_sp_avail='1'
             self.ex_fileList.append(ex_file)
         print(f'Creating {file_name} for {batchCount} files')
-        proj_file = self.config['Paths']['metaDir']+eval(self.config['groupFiles']['groupMetaData'])
+        proj_file = self.config['Paths']['metaDir']+'/'+eval(self.config['groupFiles']['groupMetaData'])
         file_prototype = groupInfo['Custom','file_prototype','first']
         master_sonic = groupInfo['Instruments','instr_1_model','first']
         if file_prototype.endswith('.ghg'):
