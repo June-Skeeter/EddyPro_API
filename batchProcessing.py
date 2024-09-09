@@ -88,6 +88,7 @@ class Parser():
             except Exception as e:
                 print(f"extraction failed for: {filepath}")
                 d_agg,metaData=None,None
+                self.ignore = []
                 pass
         else:
             d_agg, d_names = self.readData(filepath,self.fileDescription,timestamp)
@@ -161,16 +162,13 @@ class Parser():
                 pass
         D1 = data.columns[data.isna().all()].tolist()
         self.ignore = [i+1 for i,c in enumerate(data.columns) if c in D1]
-        # data = data.dropna(how='all',axis=1)
-        # D2 = data.columns[data.isna().all()].tolist()
-        # print([d for d in D1 if d not in D2])
+        
         # generate dict of column names to add back into Metadata
         col_names = {}
         for i,c in enumerate(data.columns.get_level_values(0)):
             col_names[('Custom',f'col_{i+1}_header_name')] = c
         # Generate the aggregation statistics, but only for numeric columns
         data = data._get_numeric_data()
-        d_agg = data.agg(self.agg)
         data = data.loc[:,[c for c in data.columns if c not in self.config['monitoringInstructions']['dataExclude']]]
         data.replace([np.inf, -np.inf], np.nan, inplace=True)
         d_agg = data.agg(self.agg)
