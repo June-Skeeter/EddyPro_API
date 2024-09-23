@@ -469,9 +469,9 @@ class eddyProAPI():
                 var_ix = [i.split('_')[1] for i,v in (row[variable]==value['variable']).items() if v == True]
                 for m in value['measure_type']:
                     meas_ix = [i.split('_')[1] for i,v in (row[measurement_types]==m).items() if v == True]
-                    if len(meas_ix)>0:
+                    col_num = list(set(var_ix) & set(meas_ix))
+                    if len(col_num)>0:
                         break
-                col_num = list(set(var_ix) & set(meas_ix))
                 if len(col_num)==1:
                     col_num = col_num[0]
                 else:
