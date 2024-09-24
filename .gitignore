@@ -1,6 +1,8 @@
 __pycache__
-.vscode
+.venv/
+.vscode/
 *old.py
 *ex.py
 *_Testing.ipynb
 *test.py
+*user_path_definitions.yml
