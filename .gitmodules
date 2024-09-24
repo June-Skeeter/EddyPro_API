@@ -1,3 +1,6 @@
 [submodule "pyDbTools"]
 	path = pyDbTools
 	url = https://github.com/CANFLUX/pyDbTools.git
+[submodule "setupPyVenv"]
+	path = setupPyVenv
+	url = https://github.com/CANFLUX/setupPyVenv
