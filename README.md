@@ -79,3 +79,8 @@ The API can be called via command line; instructions are given below.  You can a
     b. Call the program.  In this example, the program will execute for the current year, on the BB site, using Templates/ClosedPathStandard.eddypro to define the processing procedures.  Since biometUser was set to true the API will auto generate csv files containing biomet (e.g., TA, PAR, etc.) and dynamic metadata (e.g., canopy height) before running and will dump results form the "full_output" files to the Biomet.Net database format.
 
     `py eddyProAPI.py --siteID BB --biometUser True --eddyProStaticConfig Templates/ClosedPathStandard.eddypro`
+    
+
+#### Example Call
+
+`python eddyProAPI.py --siteID BB --biometUser True --sourceDir C:/highfreq/BB/raw/ --metaDataUpdates C:/highfreq/BB/Manual_Metadata_Updates.csv --eddyProStaticConfig Templates/ClosedPathStandard.eddypro --dateRange 2023-06-01 2024-01-02 --runMode 2 --reset True `

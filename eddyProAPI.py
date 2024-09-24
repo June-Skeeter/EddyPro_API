@@ -140,13 +140,12 @@ class eddyProAPI():
         os.makedirs(self.config['Paths']['outputDir'],exist_ok=True)
         # On the fly Biomet and dynamicMetadata csv file generation
         # For Biomet.net users only
-        if self.biometUser and os.path.isdir(self.config['BiometUser']['Biomet.net']):
+        if self.biometUser and os.path.isdir(self.config['relDir']['Database']):
             print('Biomet user: Querying database for up-to-date biomet data')
             auxilaryDpaths=queryBiometDatabase(
                 siteID=self.siteID,
                 outputPath = self.config['Paths']['metaDir'],
-                biometPath = self.config['BiometUser']['Biomet.net'],
-                database = self.config['BiometUser']['Database'],
+                database = self.config['relDir']['Database'],
                 dateRange = self.dateRange)
             for key,value in auxilaryDpaths.items():
                 setattr(self, key, value)
@@ -715,14 +714,13 @@ class eddyProAPI():
             os.makedirs(d_out)
         batchProcessing.pasteWithSubprocess(d_in,d_out,option='xcopy')
         shutil.rmtree(d_in)
-        if self.biometUser and os.path.isdir(self.config['BiometUser']['Biomet.net']):
+        if self.biometUser and os.path.isdir(self.config['relDir']['Database']):
             for outFile,metaData in self.config['fccFinalOutputs'].items():
                 toDump = fnmatch.filter(os.listdir(d_out),f'*{outFile}*')
                 for td in toDump:
                     print(td)
                     dumpToBiometDatabase(siteID=self.siteID,
-                                        biometPath = self.config['BiometUser']['Biomet.net'],
-                                        database = self.config['BiometUser']['Database'],
+                                        database = self.config['relDir']['Database'],
                                         inputFile=f"{d_out}/{td}",
                                         metaData=metaData,
                                         stage='epOutputs',
