@@ -641,7 +641,7 @@ class eddyProAPI():
                        
         eddyProCols = configparser.ConfigParser()
         eddyProCols.read(
-            self.config['Paths']['metaDir']+eval(self.config['groupFiles']['eddyProCols'])
+            self.config['Paths']['metaDir']+'/'+eval(self.config['groupFiles']['eddyProCols'])
         )
         self.groupEddyProConfig = configparser.ConfigParser() 
         for section in self.eddyProStaticConfig.keys():
