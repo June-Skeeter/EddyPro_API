@@ -32,7 +32,7 @@ os.chdir(dname)
 
 # Default arguments
 defaultArgs = {
-    'runMode':'3',
+    'runMode':'2',
     'siteID':'SomeSite',
     'sourceDir':[],
     'dateRange':[date(datetime.now().year,1,1).strftime("%Y-%m-%d"),datetime.now().strftime("%Y-%m-%d")],
@@ -281,7 +281,7 @@ class eddyProAPI():
 
         for m,v in byMonth.items():
             # Initiate parser class, defined externally to facilitate parallel processing
-            Parser = batchProcessing.Parser(self.config,self.metaDataTemplate)
+            Parser = batchProcessing.Parser(self.config,self.metaDataTemplate,verbose=self.debug)
             T2 = time.time()
             if v >0:
                 print(f"{m.year}-{m.month}")

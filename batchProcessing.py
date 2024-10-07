@@ -7,6 +7,7 @@ import sys
 import psutil
 import shutil
 import zipfile
+import warnings
 import datetime
 import importlib
 import subprocess
@@ -118,7 +119,7 @@ class Parser():
             fileDescription.update(self.config['ghg'])
             if hasattr(fileDescription, 'skip_rows') == False:
                 fileDescription['skip_rows'] = int(fileDescription['header_rows'])-1
-                fileDescription['header_rows'] = [0]
+                fileDescription['header_rows'] = 0
             with ghgZip.open(ghgInventory['.data']) as f:
                 d_agg, d_names = self.readData(f,fileDescription,timestamp)
             metaData.update(d_names)
@@ -142,15 +143,24 @@ class Parser():
     def readData(self,dataFile,fileDescription,timestamp):
         # read the raw high frequency data
         # parse the column names and output desired aggregation statistics for each raw data file
-        if 'na_values' in fileDescription.keys():
-            data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
+        if type(fileDescription['header_rows']=='list'):
+            index_col=None
         else:
-            data = pd.read_csv(dataFile,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=self.config['intNaN'])
+            index_col=False
+        with warnings.catch_warnings(record=True) as w:
+            # Only capture the specific ParserWarning
+            warnings.simplefilter("always", category=pd.errors.ParserWarning)
+            if 'na_values' in fileDescription.keys():
+                data = pd.read_csv(dataFile,index_col=index_col,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
+            else:
+                data = pd.read_csv(dataFile,index_col=index_col,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=self.config['intNaN'])
+            if w and any(issubclass(warning.category, pd.errors.ParserWarning) for warning in w):
+                print("ParserWarning detected: Adjusting headers.")
         if fileDescription['data_label'] != 'Not set':
             # .ghg data files contain a "DATA" label if first column which isn't needed
             data = data.drop(data.columns[0],axis=1)
         # Parse units from metadata if not included in headers
-        if len(fileDescription['header_rows']) == 1:
+        if type(fileDescription['header_rows']) != list or len(fileDescription['header_rows']) == 1:
             unit_list = [value for key,value in fileDescription.items() if 'unit_in' in key]
             try:
                 data.columns = [data.columns,unit_list]
