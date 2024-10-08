@@ -4,6 +4,7 @@
 import os
 import re
 import sys
+import yaml
 import psutil
 import shutil
 import zipfile
@@ -69,8 +70,14 @@ def findFiles(inName,in_dir,fileInfo,checkList=[],dateRange=None):
     return(empty)
 
 class Parser():
-    def __init__(self,config,metaDataTemplate='None',verbose=False):
-        self.config = config
+    def __init__(self,config=None,metaDataTemplate='None',verbose=False):
+        if config is None:
+            with open('config_files/config.yml') as yml:
+                self.config = yaml.safe_load(yml)
+            with open('config_files/ecFileFormats.yml') as yml:
+                self.config.update(yaml.safe_load(yml))
+        else:
+            self.config = config
         self.verbose = verbose
         self.nOut = 2
         # Define statistics to aggregate raw data by, see configuration
@@ -81,8 +88,12 @@ class Parser():
 
     def readFile(self,file):
         set_high_priority()
-        timestamp=file[0]
-        filepath=file[1]
+        if type(file) == str:
+            timestamp = None
+            filepath = file
+        else:
+            timestamp=file[0]
+            filepath=file[1]
         if filepath.endswith('.ghg'):
             try:
                 d_agg,metaData = self.extractGHG(filepath,timestamp)
@@ -99,8 +110,8 @@ class Parser():
         # Ignore missing data
         if len(self.ignore)>0:
             for i in self.ignore:
-                metaData[('FileDescription',f'col_{i}_variable')]='ignore'
-                metaData[('FileDescription',f'col_{i}_instrument')]=''
+                metaData[('FileDescription',f'col_{i+1}_variable')]='ignore'
+                metaData[('FileDescription',f'col_{i+1}_instrument')]=''
         
         metaData = pd.DataFrame(metaData,index=[timestamp])
         metaData.index.name = 'TIMESTAMP'
@@ -143,7 +154,7 @@ class Parser():
     def readData(self,dataFile,fileDescription,timestamp):
         # read the raw high frequency data
         # parse the column names and output desired aggregation statistics for each raw data file
-        if type(fileDescription['header_rows']=='list'):
+        if type(fileDescription['header_rows'])==list:
             index_col=None
         else:
             index_col=False
@@ -155,7 +166,7 @@ class Parser():
             else:
                 data = pd.read_csv(dataFile,index_col=index_col,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=self.config['intNaN'])
             if w and any(issubclass(warning.category, pd.errors.ParserWarning) for warning in w):
-                print("ParserWarning detected: Adjusting headers.")
+                print("ParserWarning detected: Adjusting headers")
         if fileDescription['data_label'] != 'Not set':
             # .ghg data files contain a "DATA" label if first column which isn't needed
             data = data.drop(data.columns[0],axis=1)
@@ -170,16 +181,18 @@ class Parser():
                 if self.verbose == True:
                     print(f'Dropped NaN columns in {dataFile.name} to force metadata match')
                 pass
+        self.ignore = [int(key.split('_')[1])-1 for key,value in fileDescription.items() if value == 'ignore']
         D1 = data.columns[data.isna().all()].tolist()
-        self.ignore = [i+1 for i,c in enumerate(data.columns) if c in D1]
-        
+        self.ignore = self.ignore+ [i for i,c in enumerate(data.columns) if c in D1 and i not in self.ignore]
         # generate dict of column names to add back into Metadata
         col_names = {}
         for i,c in enumerate(data.columns.get_level_values(0)):
             col_names[('Custom',f'col_{i+1}_header_name')] = c
-        # Generate the aggregation statistics, but only for numeric columns
+        # Generate the aggregation statistics, but only for numeric columns that are not being ignored
+        to_drop = [data.columns[i] for i in self.ignore]
+        data = data.drop(to_drop,axis=1)
         data = data._get_numeric_data()
-        data = data.loc[:,[c for c in data.columns if c not in self.config['monitoringInstructions']['dataExclude']]]
+        # data = data.loc[:,[c for c in data.columns if c[0] not in self.config['monitoringInstructions']['dataExclude']]]
         data.replace([np.inf, -np.inf], np.nan, inplace=True)
         d_agg = data.agg(self.agg)
         d_agg['Timestamp'] = timestamp

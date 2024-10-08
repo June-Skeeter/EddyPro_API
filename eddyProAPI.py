@@ -44,7 +44,6 @@ defaultArgs = {
     'processes':os.cpu_count()-2,
     'priority':'normal',
     'debug':False,
-    'testSet':0,
     'reset':False,
     'name':'batchRun',
     'biometData':'None',
@@ -162,6 +161,7 @@ class eddyProAPI():
                     dtypes[(key,val)]=dtype
         for key,value in read_files.items():
             if os.path.isfile(value['filepath_or_buffer']):
+                print(value['filepath_or_buffer'])
                 setattr(self, key,(pd.read_csv(dtype=dtypes,**value)))
             else:
                 setattr(self, key,pd.DataFrame())            
@@ -233,13 +233,9 @@ class eddyProAPI():
                             pb.close()
                     else:
                         # run routine sequentially for debugging
-                        testOffset=0
                         for i,filename in enumerate(fileList):
-                            if self.debug == False or i < self.testSet + testOffset or self.testSet == 0:
-                                out = batchProcessing.findFiles(filename,dir,fileInfo=fileInfo,dateRange=self.dateRange)
-                                if out[1] is None and self.testSet > 0:
-                                    testOffset += 1
-                                dout.append(out)
+                            out = batchProcessing.findFiles(filename,dir,fileInfo=fileInfo,dateRange=self.dateRange)
+                            dout.append(out)
                     # Dump results to inventory
                     # source and filename will be different if a timeShift is applied when copying
                     df = pd.DataFrame(columns=['TIMESTAMP','source','filename','file_prototype'],data=dout)
@@ -266,6 +262,7 @@ class eddyProAPI():
             self.fileInventory['groupID'] = self.fileInventory['groupID'].astype(int)
         self.fileInventory.to_csv(self.config['fileInventory'])
         print('Files Search Complete, time elapsed: ',np.round(time.time()-T1,3))
+        # print(pd.date_range(start=self.dateRange.min(),end=self.dateRange.max(),freq='M'))
     
     def readFiles(self):
         T1 = time.time()
@@ -301,10 +298,9 @@ class eddyProAPI():
                 else:
                     # run routine sequentially
                     for i, (timestamp,file) in enumerate(pathList.items()):
-                        if i < self.testSet or self.testSet == 0:
-                            T2 = time.time()
-                            out = Parser.readFile((timestamp,file))
-                            self.mergeStats(out)
+                        T2 = time.time()
+                        out = Parser.readFile((timestamp,file))
+                        self.mergeStats(out)
                         if self.debug == True:
                             print(f'{file} complete, time elapsed:git ',np.round(time.time()-T2,3)) 
             self.mergeStats()
@@ -652,7 +648,8 @@ class eddyProAPI():
                     self.groupEddyProConfig.set(section, option, eddyProCols[section][option])
                 # Use evaluate statement for dynamic settings
                 if self.eddyProDynamicConfig.has_section(section) and self.eddyProDynamicConfig.has_option(section, option):  
-                    self.groupEddyProConfig.set(section, option, eval(self.eddyProDynamicConfig[section][option]))
+                    setting = eval(self.eddyProDynamicConfig[section][option]).replace('\\','/')
+                    self.groupEddyProConfig.set(section, option, setting)
                 # User supplied variables will overwrite any other settings
                 if section in self.userDefinedEddyProSettings.keys() and option in self.userDefinedEddyProSettings[section].keys():
                     self.groupEddyProConfig.set(section, option,str(self.userDefinedEddyProSettings[section][option]))

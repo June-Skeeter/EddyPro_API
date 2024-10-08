@@ -169,20 +169,22 @@ monitoringInstructions:
       - pc_time_settings
       
   dataAggregation:
-    # Will yield the following statistics for all raw traces when set to True
+    # Will yield the following statistics for raw traces when set to True
+    # any trace set to ignore in the .metadata file will be ignored by default
+    # them more stats generated, the larger the dataset, so use with caution
     # See options here: https://pandas.pydata.org/pandas-docs/stable/reference/groupby.html#dataframegroupby-computations-descriptive-stats
     mean: True
-    std: True
+    std: False
     median: False
     max: True
     min: True
     count: False
 
-  dataExclude:
-  - RECORD
-  - Seconds
-  - Nanoseconds
-  - Sequence Number
+  # dataExclude:
+  # - RECORD
+  # - Seconds
+  # - Nanoseconds
+  # - Sequence Number
     
   dataFilters:
     Sonic_Filter:
