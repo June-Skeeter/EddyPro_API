@@ -3,33 +3,34 @@ import os
 import numpy as np
 import pandas as pd
 
-def queryBiometDatabase(siteID,outputPath,biometPath,database,dateRange):
+def queryBiometDatabase(siteID,outputPath,database,dateRange):
     # UBC Micromet users can use this to generate Biomet and daynamicMetadata on the fly
     wd = os.path.dirname(os.path.realpath(__file__))
-    sys.path.insert(1,os.path.abspath(biometPath+'/Python'))
+    sys.path.insert(1,f"{wd}/pyDbTools/")
     import csvFromBinary as cfb    
-    sys.path.remove(os.path.abspath(biometPath+'/Python'))
+    sys.path.remove(f"{wd}/pyDbTools/")
     createAuxilaryData = os.path.abspath(wd+'/config_files/BiometDataFileTemplate.yml')
     auxilaryDpaths=cfb.makeCSV(
         siteID=siteID,
         outputPath=outputPath,
-        database=database,
+        database=f"{database}/",
         tasks=createAuxilaryData,
         stage='Second',
         dateRange=dateRange,
         nameTimeStamp=False)
     return(auxilaryDpaths)
 
-def dumpToBiometDatabase(siteID,biometPath,database,inputFile,metaData,stage,tag=''):
-    sys.path.insert(1,os.path.abspath(biometPath+'/Python'))
+def dumpToBiometDatabase(siteID,database,inputFile,metaData,stage,tag=''):
+    wd = os.path.dirname(os.path.realpath(__file__))
+    sys.path.insert(1,f"{wd}/pyDbTools/")
     import binaryFromText as bft
-    sys.path.remove(os.path.abspath(biometPath+'/Python'))
+    sys.path.remove(f"{wd}/pyDbTools/")
     if tag != '': stage = f"{stage}_{tag}"
     print(inputFile,metaData)
     bft.writeTraces(siteID,
                     inputFile,
                     metaData,
-                    database=database,
+                    database=f"{database}/",
                     excludeCols=['bad*','x_??%','none*'],
                     mode='repfill',
                     stage=stage,

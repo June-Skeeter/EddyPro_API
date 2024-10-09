@@ -6,9 +6,9 @@
 
 RelativePaths:
   # RelativePaths will dynamically added to a "Paths" section below using eval statements
-  sourceDir: f"{self.config['rootDir']['workingDir']}/{self.siteID}/raw/"
-  metaDir: f"{self.config['rootDir']['workingDir']}/{self.siteID}/metadata/"
-  outputDir: f"{self.config['rootDir']['workingDir']}/{self.siteID}/eddyProAPIOutputs/"
+  sourceDir: f"{self.config['relDir']['HighFrequency']}/{self.siteID}/raw/"
+  metaDir: f"{self.config['relDir']['HighFrequency']}/{self.siteID}/metadata/"
+  outputDir: f"{self.config['relDir']['HighFrequency']}/{self.siteID}/eddyProAPIOutputs/"
   baseEddyPro: f"{self.config['rootDir']['EddyPro']}/bin/"
 
 metadataFiles:
@@ -169,20 +169,22 @@ monitoringInstructions:
       - pc_time_settings
       
   dataAggregation:
-    # Will yield the following statistics for all raw traces when set to True
+    # Will yield the following statistics for raw traces when set to True
+    # any trace set to ignore in the .metadata file will be ignored by default
+    # them more stats generated, the larger the dataset, so use with caution
     # See options here: https://pandas.pydata.org/pandas-docs/stable/reference/groupby.html#dataframegroupby-computations-descriptive-stats
     mean: True
-    std: True
+    std: False
     median: False
     max: True
     min: True
     count: False
 
-  dataExclude:
-  - RECORD
-  - Seconds
-  - Nanoseconds
-  - Sequence Number
+  # dataExclude:
+  # - RECORD
+  # - Seconds
+  # - Nanoseconds
+  # - Sequence Number
     
   dataFilters:
     Sonic_Filter:
