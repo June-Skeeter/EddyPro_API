@@ -128,9 +128,9 @@ class Parser():
             with ghgZip.open(ghgInventory['.metadata']) as f:
                 metaData,fileDescription = self.readMetaData(TextIOWrapper(f, 'utf-8'))
             fileDescription.update(self.config['ghg'])
-            if hasattr(fileDescription, 'skip_rows') == False:
-                fileDescription['skip_rows'] = int(fileDescription['header_rows'])-1
-                fileDescription['header_rows'] = 0
+            if hasattr(fileDescription, 'skiprows') == False:
+                fileDescription['skiprows'] = int(fileDescription['header'])-1
+                fileDescription['header'] = 0
             with ghgZip.open(ghgInventory['.data']) as f:
                 d_agg, d_names = self.readData(f,fileDescription,timestamp)
             metaData.update(d_names)
@@ -144,9 +144,11 @@ class Parser():
         metaData = configparser.ConfigParser()
         metaData.read_file(metaDataFile)
         metaData = {key:dict(metaData[key]) for key in metaData.keys()}
-        # Isolate and parse file description for reading data files
-        fileDescription = metaData['FileDescription'].copy()
-        fileDescription['delimiter'] = self.config['delimiters'][fileDescription['separator']].encode('ascii','ignore').decode('unicode_escape')
+        # Parse file description for reading data files
+        # Format to be used as **kwarg in pd.read_csv()
+        fileDescription = {}# metaData['FileDescription'].copy()
+        fileDescription['header'] = metaData['FileDescription']['header_rows']
+        fileDescription['delimiter'] = self.config['delimiters'][metaData['FileDescription']].encode('ascii','ignore').decode('unicode_escape')
         # Reformat for dumping to DataFrame        
         metaData = {(k1,k2):val for k1 in metaData.keys() for k2,val in metaData[k1].items()}
         return(metaData,fileDescription)
@@ -154,17 +156,20 @@ class Parser():
     def readData(self,dataFile,fileDescription,timestamp):
         # read the raw high frequency data
         # parse the column names and output desired aggregation statistics for each raw data file
-        if type(fileDescription['header_rows'])==list:
-            index_col=None
+        if type(fileDescription['header'])==list:
+            fileDescription['index_col']=None
         else:
-            index_col=False
+            fileDescription['index_col']=False
+        if hasattr(fileDescription,'na_values') == False:
+            fileDescription['na_values'] = self.config['intNaN']
         with warnings.catch_warnings(record=True) as w:
             # Only capture the specific ParserWarning
             warnings.simplefilter("always", category=pd.errors.ParserWarning)
-            if 'na_values' in fileDescription.keys():
-                data = pd.read_csv(dataFile,index_col=index_col,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
-            else:
-                data = pd.read_csv(dataFile,index_col=index_col,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=self.config['intNaN'])
+            data = pd.read_csv(dataFile,**fileDescription)
+            # if 'na_values' in fileDescription.keys():
+            #     data = pd.read_csv(dataFile,index_col=index_col,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
+            # else:
+            #     data = pd.read_csv(dataFile,index_col=index_col,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=self.config['intNaN'])
             if w and any(issubclass(warning.category, pd.errors.ParserWarning) for warning in w):
                 print("ParserWarning detected: Adjusting headers")
         if fileDescription['data_label'] != 'Not set':

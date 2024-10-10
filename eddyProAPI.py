@@ -39,7 +39,7 @@ defaultArgs = {
     'fileType':'ghg',
     'eddyProStaticConfig':'Templates/DefaultSettings.eddypro',
     'eddyProDynamicConfig':'config_files/eddyProDynamicConfig.ini',
-    'GHG_Metadata_Template':'config_files/GHG_Metadata_Template.metadata',
+    'GHG_Metadata_Template':'Templates/GHG_Metadata_Template.metadata',
     'metaDataTemplate':'None',
     'processes':os.cpu_count()-2,
     'priority':'normal',
@@ -181,9 +181,11 @@ class eddyProAPI():
         mainTime = time.time()
         self.searchRawDir()
         self.readFiles()
+        if self.metaDataTemplate == 'None' and self.fileType != 'ghg':
+            self.makeMetaDataFile()
         if self.metaDataUpdates != 'None':
             print('Applying Manual Metadata Adjustments')
-            self.usermetaDataUpdates() 
+            self.userMetaDataUpdates() 
         self.groupAndFilter()
         print(f"Pre-Processing complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
         
@@ -262,7 +264,9 @@ class eddyProAPI():
             self.fileInventory['groupID'] = self.fileInventory['groupID'].astype(int)
         self.fileInventory.to_csv(self.config['fileInventory'])
         print('Files Search Complete, time elapsed: ',np.round(time.time()-T1,3))
-        # print(pd.date_range(start=self.dateRange.min(),end=self.dateRange.max(),freq='M'))
+    
+    def makeMetaDataFile(self):
+        pass
     
     def readFiles(self):
         T1 = time.time()
@@ -334,7 +338,7 @@ class eddyProAPI():
             if self.debug == True:
                 print(out[0],np.round(time.time()-T1,2))
     
-    def usermetaDataUpdates(self):
+    def userMetaDataUpdates(self):
         df = pd.read_csv(self.metaDataUpdates,header=[0,1])
         df[('TIMESTAMP','Start')] = pd.to_datetime(df[('TIMESTAMP','Start')])
         df[('TIMESTAMP','End')] = pd.to_datetime(df[('TIMESTAMP','End')])
@@ -396,7 +400,7 @@ class eddyProAPI():
         self.fileInventory = self.fileInventory.join(groupLabels)
         self.fileInventory[gcol]=self.fileInventory[gcol].fillna(self.config['intNaN']).astype(np.int32)
         # Add the file_prototype template to the configuration groups
-        self.makeMetadataFiles()
+        self.makeGroupMetadataFiles()
         self.filterData()        
         temp = self.fileInventory[list(groupLabels.columns)+['file_prototype']].groupby(list(groupLabels.columns)).agg(['first'])
         temp.columns = pd.MultiIndex.from_product([['Custom']]+temp.columns.levels)
@@ -404,7 +408,7 @@ class eddyProAPI():
         ptype = ('Custom','file_prototype','first')
         self.saveMetadataFiles()
 
-    def makeMetadataFiles(self):
+    def makeGroupMetadataFiles(self):
         # Creates two files
         #   1) A .metadata file representative of all non-dynamic values
         #   2) A .eddypro file representing the relevant column numbers in the .dat(a) files
@@ -439,7 +443,7 @@ class eddyProAPI():
                     if section in groupMetaData and key in groupMetaData[section]:
                         metaDataFile[section][key] = groupMetaData[section][key]
                     elif section not in groupMetaData:
-                        metaDataFile[section][key] = self.GHG_Metadata_Template[section][key]
+                        metaDataFile[section][key] = eval(self.GHG_Metadata_Template[section][key])
                     else:
                         orderedKeys.append(key)
                 for i in range(dynamicVals[section]):
