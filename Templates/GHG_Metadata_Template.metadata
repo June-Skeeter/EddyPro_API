@@ -2,11 +2,11 @@
 [Project]
 title='GHG_Metadata_Template'
 id='GHG_Metadata_Template'
-creation_date=pd.to_datetime(dt.datetime.now()).floor('s')
-last_change_date=pd.to_datetime(dt.datetime.now()).floor('s')
+creation_date=pd.to_datetime(datetime.now()).floor('s')
+last_change_date=pd.to_datetime(datetime.now()).floor('s')
 start_date=
 end_date=
-file_name=f"{os.getcwd()}/{self.siteID}_GHG_Metadata.metadata"
+file_name="{self.siteID}_GHG_Metadata.metadata"
 sw_version=
 ini_version=
 
@@ -62,7 +62,7 @@ instr_*_ko=
 [FileDescription]
 separator=
 header_rows=
-data_label=
+data_label=Not set
 col_*_variable=
 col_*_instrument=
 col_*_measure_type=
