@@ -2,8 +2,8 @@
 [Project]
 title='GHG_Metadata_Template'
 id='GHG_Metadata_Template'
-creation_date=pd.to_datetime(datetime.now()).floor('s')
-last_change_date=pd.to_datetime(datetime.now()).floor('s')
+creation_date=datetime.now().strftime('%%Y%%m%%d%%H%%M')
+last_change_date=datetime.now().strftime('%%Y%%m%%d%%H%%M')
 start_date=
 end_date=
 file_name="{self.siteID}_GHG_Metadata.metadata"
