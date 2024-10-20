@@ -36,10 +36,10 @@ defaultArgs = {
     'siteID':'SomeSite',
     'sourceDir':[],
     'dateRange':[date(datetime.now().year,1,1).strftime("%Y-%m-%d"),datetime.now().strftime("%Y-%m-%d")],
-    'fileType':'ghg',
+    'fileType':'auto',
     'eddyProStaticConfig':'Templates/DefaultSettings.eddypro',
     'eddyProDynamicConfig':'config_files/eddyProDynamicConfig.ini',
-    'GHG_Metadata_Template':'config_files/GHG_Metadata_Template.metadata',
+    'GHG_Metadata_Template':'Templates/GHG_Metadata_Template.metadata',
     'metaDataTemplate':'None',
     'processes':os.cpu_count()-2,
     'priority':'normal',
@@ -110,7 +110,7 @@ class eddyProAPI():
         with open('config_files/ecFileFormats.yml') as yml:
             self.config.update(yaml.safe_load(yml))
         self.config['siteID'] = self.siteID
-        groupID = '\d+'
+        groupID = '\\d+'
         self.genericID = eval(self.config['stringTags']['groupID'])
         # Exit if user paths are not provided
         if os.path.isfile('config_files/user_path_definitions.yml'):
@@ -149,8 +149,13 @@ class eddyProAPI():
             for key,value in auxilaryDpaths.items():
                 setattr(self, key, value)
 
+        self.eddyProGroupDefsTemplate={'Project':{}} 
         if self.biometData != 'None':
             self.biometDataTable = pd.read_csv(self.biometData)
+            self.eddyProGroupDefsTemplate['RawProcess_BiometMeasurements'] = {}
+            for key,value in self.config['eddyProGroupDefs']['RawProcess_BiometMeasurements'].items():
+                if value in self.biometDataTable.columns:
+                    self.eddyProGroupDefsTemplate['RawProcess_BiometMeasurements'][key] = list(self.biometDataTable.columns).index(value)+1
         
         # Read the existing metadata from a previous run if they exist
         read_files = {key:value for key,value in self.config['metadataFiles'].items() if value['filepath_or_buffer'].startswith('f"')==False}
@@ -181,9 +186,11 @@ class eddyProAPI():
         mainTime = time.time()
         self.searchRawDir()
         self.readFiles()
+        if self.metaDataTemplate == 'None' and self.fileType != 'ghg':
+            self.makeMetaDataFile()
         if self.metaDataUpdates != 'None':
             print('Applying Manual Metadata Adjustments')
-            self.usermetaDataUpdates() 
+            self.userMetaDataUpdates() 
         self.groupAndFilter()
         print(f"Pre-Processing complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
         
@@ -192,22 +199,15 @@ class eddyProAPI():
         # Option to shift the timestamp: copy data and rename using shifted timestamp
         # timeShift will only be applied to data copied from another directory
         search_dirs = []
-        shiftTime = []
         if type(self.sourceDir) == list:
             for d in self.sourceDir:
                 if os.path.isdir(d):
                     search_dirs.append(d)
-                    shiftTime.append(self.timeShift)
         elif os.path.isdir(self.sourceDir):
             search_dirs.append(self.sourceDir)
-            shiftTime.append(self.timeShift)
         T1 = time.time()
-        fileInfo = self.config[self.fileType]
-        fileInfo['searchTag'] = self.searchTag
-        fileInfo['excludeTag'] = self.genericID
         # Walk the search directories
-        for search,timeShift in zip(search_dirs,shiftTime):
-            fileInfo['timeShift'] = timeShift
+        for search in search_dirs:
             for dir, _, fileList in os.walk(search):
                 # Exclude files that have already been processed from fileList
                 if 'source' in self.fileInventory.columns:
@@ -217,6 +217,19 @@ class eddyProAPI():
                 else:
                     source_names = []
                 fileList = [f for f in fileList if f not in source_names]
+                if self.fileType == 'auto':
+                    fileTypes = [f.split('.')[-1] for f in fileList]
+                    self.fileType = max(set(fileTypes), key=fileTypes.count)
+                    print(f'Auto-determined filetype: {self.fileType}')
+                if self.fileType != '.ghg' and self.metaDataTemplate == 'None':
+                    print('A')
+                    Parser = batchProcessing.Parser(self.config,self.metaDataTemplate,debug=self.debug)
+                    df = (Parser.readData(dir+'/'+[f for f in fileList if f.endswith(self.fileType)][0]))
+                    sys.exit()
+                fileInfo = self.config[self.fileType]
+                fileInfo['searchTag'] = self.searchTag
+                fileInfo['excludeTag'] = self.genericID
+                fileInfo['timeShift'] = self.timeShift
                 if len(fileList)>0:
                     print(f'Searching {dir}')
                     dout = []
@@ -262,8 +275,7 @@ class eddyProAPI():
             self.fileInventory['groupID'] = self.fileInventory['groupID'].astype(int)
         self.fileInventory.to_csv(self.config['fileInventory'])
         print('Files Search Complete, time elapsed: ',np.round(time.time()-T1,3))
-        # print(pd.date_range(start=self.dateRange.min(),end=self.dateRange.max(),freq='M'))
-    
+        
     def readFiles(self):
         T1 = time.time()
         print('Reading Data for:')
@@ -278,7 +290,7 @@ class eddyProAPI():
 
         for m,v in byMonth.items():
             # Initiate parser class, defined externally to facilitate parallel processing
-            Parser = batchProcessing.Parser(self.config,self.metaDataTemplate,verbose=self.debug)
+            Parser = batchProcessing.Parser(self.config,self.metaDataTemplate,debug=self.debug)
             T2 = time.time()
             if v >0:
                 print(f"{m.year}-{m.month}")
@@ -334,7 +346,7 @@ class eddyProAPI():
             if self.debug == True:
                 print(out[0],np.round(time.time()-T1,2))
     
-    def usermetaDataUpdates(self):
+    def userMetaDataUpdates(self):
         df = pd.read_csv(self.metaDataUpdates,header=[0,1])
         df[('TIMESTAMP','Start')] = pd.to_datetime(df[('TIMESTAMP','Start')])
         df[('TIMESTAMP','End')] = pd.to_datetime(df[('TIMESTAMP','End')])
@@ -396,7 +408,10 @@ class eddyProAPI():
         self.fileInventory = self.fileInventory.join(groupLabels)
         self.fileInventory[gcol]=self.fileInventory[gcol].fillna(self.config['intNaN']).astype(np.int32)
         # Add the file_prototype template to the configuration groups
-        self.makeMetadataFiles()
+        for groupID,row in self.configurationGroups.loc[:,pd.IndexSlice[:,:,('mean','first')]].iterrows():
+            # Dump the group's metadata values to a dict while filling NaN
+            groupMetaData = {L:{i[0]:v if type(v) == str else str(v) if ~np.isnan(v) else self.config['stringTags']['NaN'] for i,v in row[L].items()} for L in row.index.get_level_values(0).unique()}
+            self.makeMetadataFiles(groupMetaData,groupID)
         self.filterData()        
         temp = self.fileInventory[list(groupLabels.columns)+['file_prototype']].groupby(list(groupLabels.columns)).agg(['first'])
         temp.columns = pd.MultiIndex.from_product([['Custom']]+temp.columns.levels)
@@ -404,83 +419,72 @@ class eddyProAPI():
         ptype = ('Custom','file_prototype','first')
         self.saveMetadataFiles()
 
-    def makeMetadataFiles(self):
+    def makeMetadataFiles(self,groupMetaData,groupID):
         # Creates two files
         #   1) A .metadata file representative of all non-dynamic values
         #   2) A .eddypro file representing the relevant column numbers in the .dat(a) files
-        print('Writing Metadata Files')
-        eddyProGroupDefsTemplate={'Project':{}} 
-        bm = 'RawProcess_BiometMeasurements'
-        if self.biometData != 'None': 
-            eddyProGroupDefsTemplate[bm] = {}
-            for key,value in self.config['eddyProGroupDefs'][bm].items():
-                if value in self.biometDataTable.columns:
-                    eddyProGroupDefsTemplate[bm][key] = list(self.biometDataTable.columns).index(value)+1
-        for groupID,row in self.configurationGroups.loc[:,pd.IndexSlice[:,:,('mean','first')]].iterrows():
-            row = row.fillna(self.config['stringTags']['NaN'])
-            # Dump the group's metadata values to a metadata file
-            # Replace NaN (or tag) with empty string
-            groupMetaData = {                
-                L:{i[0]:(str(v)).replace(self.config['stringTags']['NaN'],'')
-                for i,v in row[L].items()} for L in 
-                row.index.get_level_values(0)
-                    }
-            dynamicVals = {
-            'Instruments': max([int(i.split('_')[1]) for i in fnmatch.filter(list(groupMetaData['Instruments'].keys()),'instr_*_model')]),
-            'FileDescription':max([int(i.split('_')[1]) for i in fnmatch.filter(list(groupMetaData['FileDescription'].keys()),'col_*_variable')])
-            }
-            metaDataFile = {}
-            for section in self.GHG_Metadata_Template.keys():
-                if section not in dynamicVals:
-                    dynamicVals[section] = 0
-                metaDataFile[section] = {}
-                orderedKeys = []
-                for key,value in self.GHG_Metadata_Template[section].items():
-                    if section in groupMetaData and key in groupMetaData[section]:
-                        metaDataFile[section][key] = groupMetaData[section][key]
-                    elif section not in groupMetaData:
-                        metaDataFile[section][key] = self.GHG_Metadata_Template[section][key]
-                    else:
-                        orderedKeys.append(key)
-                for i in range(dynamicVals[section]):
-                    for key in orderedKeys:
-                        nkey = key.replace('*',str(i+1))
-                        if nkey in groupMetaData[section]:
-                            metaDataFile[section][nkey] = groupMetaData[section][nkey]
-            filename = self.config['Paths']['metaDir']+'/'+eval(self.config['groupFiles']['groupMetaData'])
-            with open(filename, 'w') as groupMetaData:
-                groupMetaData.write(';GHG_METADATA\n')
-                cfg = configparser.ConfigParser()
-                cfg.read_dict(metaDataFile)
-                cfg.write(groupMetaData,space_around_delimiters=False)
-            # Identify the column numbers relevant to EddyPro
-            eddyProGroupDefs=eddyProGroupDefsTemplate.copy()
-            row.index = row.index.get_level_values(1)
-            variable = fnmatch.filter(row.index,'col_*_variable')
-            measurement_types = fnmatch.filter(row.index,'col_*_measure_type')
-            for key,value in self.config['eddyProGroupDefs']['Project'].items():
-                if ('measure_type' in value.keys()) ==False:
-                    value['measure_type'] = [self.config['stringTags']['NaN']]
-                var_ix = [i.split('_')[1] for i,v in (row[variable]==value['variable']).items() if v == True]
-                for m in value['measure_type']:
-                    meas_ix = [i.split('_')[1] for i,v in (row[measurement_types]==m).items() if v == True]
-                    col_num = list(set(var_ix) & set(meas_ix))
-                    if len(col_num)>0:
-                        break
-                if len(col_num)==1:
-                    col_num = col_num[0]
+        dynamicVals = {
+        'Instruments': max([int(i.split('_')[1]) for i in fnmatch.filter(list(groupMetaData['Instruments'].keys()),'instr_*_model')]),
+        'FileDescription':max([int(i.split('_')[1]) for i in fnmatch.filter(list(groupMetaData['FileDescription'].keys()),'col_*_variable')])
+        }
+        metaDataFile = {}
+        for section in self.GHG_Metadata_Template.keys():
+            if section not in dynamicVals:
+                dynamicVals[section] = 0
+            metaDataFile[section] = {}
+            orderedKeys = []
+            for key,value in self.GHG_Metadata_Template[section].items():
+                if section in groupMetaData and key in groupMetaData[section]:
+                    metaDataFile[section][key] = groupMetaData[section][key]
+                elif section not in groupMetaData:
+                    val = self.GHG_Metadata_Template[section][key]
+                    if val != '':
+                        try:
+                            metaDataFile[section][key] = eval(val)
+                        except:
+                            cc = compile(f"{val} = input(key)",'<string>','single')
+                            metaDataFile[section][key] = eval(cc)
+                            pass
                 else:
-                    col_num = '0'
-                eddyProGroupDefs['Project'][key] = col_num
-            file_prototype = self.fileInventory.loc[self.fileInventory['groupID']==groupID,'file_prototype'].values[0]
-            eddyProCols = configparser.ConfigParser()
-            eddyProCols.read_dict(eddyProGroupDefs)
-            # Save the run and append to the list of runs
-            filename = self.config['Paths']['metaDir']+'/'+eval(self.config['groupFiles']['eddyProCols'])
-            print(filename)
-            with open(filename, 'w') as eddypro:
-                eddypro.write(';EDDYPRO_PROCESSING\n')
-                eddyProCols.write(eddypro,space_around_delimiters=False)
+                    orderedKeys.append(key)
+            for i in range(dynamicVals[section]):
+                for key in orderedKeys:
+                    nkey = key.replace('*',str(i+1))
+                    if nkey in groupMetaData[section]:
+                        metaDataFile[section][nkey] = groupMetaData[section][nkey]
+        filename = self.config['Paths']['metaDir']+'/'+eval(self.config['groupFiles']['groupMetaData'])
+        with open(filename, 'w') as groupMetaDataFile:
+            groupMetaDataFile.write(';GHG_METADATA\n')
+            cfg = configparser.ConfigParser()
+            cfg.read_dict(metaDataFile)
+            cfg.write(groupMetaDataFile,space_around_delimiters=False)
+        # Identify the column numbers relevant to EddyPro
+        eddyProGroupDefs=self.eddyProGroupDefsTemplate.copy()
+        variable = fnmatch.filter(groupMetaData['FileDescription'],'col_*_variable')
+        measurement_types = fnmatch.filter(groupMetaData['FileDescription'],'col_*_measure_type')
+        for key,value in self.config['eddyProGroupDefs']['Project'].items():
+            if ('measure_type' in value.keys()) ==False:
+                value['measure_type'] = [self.config['stringTags']['NaN']]
+            var_ix = [v.split('_')[1] for v in variable if groupMetaData['FileDescription'][v] == value['variable']]
+            for m in value['measure_type']:
+                meas_ix = [v.split('_')[1] for v in measurement_types if groupMetaData['FileDescription'][v] == m]
+                col_num = list(set(var_ix) & set(meas_ix))
+                if len(col_num)>0:
+                    break
+            if len(col_num)==1:
+                col_num = col_num[0]
+            else:
+                col_num = '0'
+            eddyProGroupDefs['Project'][key] = col_num
+        file_prototype = self.fileInventory.loc[self.fileInventory['groupID']==groupID,'file_prototype'].values[0]
+        eddyProCols = configparser.ConfigParser()
+        eddyProCols.read_dict(eddyProGroupDefs)
+        # Save the run and append to the list of runs
+        filename = self.config['Paths']['metaDir']+'/'+eval(self.config['groupFiles']['eddyProCols'])
+        print(filename)
+        with open(filename, 'w') as eddypro:
+            eddypro.write(';EDDYPRO_PROCESSING\n')
+            eddyProCols.write(eddypro,space_around_delimiters=False)
 
     def filterData(self):
         print("Applying Filters:")
@@ -598,7 +602,7 @@ class eddyProAPI():
 
     def makeBatch(self,groupID,project_id,groupInfo,batchStart,batchEnd,batchCount):
         id = f'group_{groupID}'
-        file_name = f"{self.tempDir}\{project_id}.eddypro"
+        file_name = f"{self.tempDir}/{project_id}.eddypro"
         if '_rp_' in file_name:
             self.rpBatches[file_name] = self.fileInventory.loc[((self.fileInventory.index>=batchStart)&
                                            (self.fileInventory.index<=batchEnd)&
