@@ -1,0 +1,3 @@
+[submodule "pyDbTools"]
+	path = pyDbTools
+	url = https://github.com/CANFLUX/pyDbTools
