@@ -211,6 +211,7 @@ class eddyProAPI():
             for dir, _, fileList in os.walk(search):
                 # Exclude files that have already been processed from fileList
                 if 'source' in self.fileInventory.columns:
+                    print(self.fileInventory.index)
                     source_list = self.fileInventory.loc[((self.fileInventory.index>=self.dateRange.min())&
                                                           (self.fileInventory.index<=self.dateRange.max())),'source'].values
                     source_names = [os.path.basename(f) for f in source_list]
