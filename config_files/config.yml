@@ -6,9 +6,9 @@
 
 RelativePaths:
   # RelativePaths will dynamically added to a "Paths" section below using eval statements
-  sourceDir: f"{self.config['relDir']['HighFrequency']}/{self.siteID}/raw/"
-  metaDir: f"{self.config['relDir']['HighFrequency']}/{self.siteID}/metadata/"
-  outputDir: f"{self.config['relDir']['HighFrequency']}/{self.siteID}/eddyProAPIOutputs/"
+  sourceDir: f"{self.config['rootDir']['HighFrequency']}/{self.siteID}/raw/"
+  metaDir: f"{self.config['rootDir']['HighFrequency']}/{self.siteID}/metadata/"
+  outputDir: f"{self.config['rootDir']['HighFrequency']}/{self.siteID}/eddyProAPIOutputs/"
   baseEddyPro: f"{self.config['rootDir']['EddyPro']}/bin/"
 
 metadataFiles:
@@ -48,6 +48,7 @@ fccFinalOutputs:
     date_format: '%Y-%m-%d %H:%M'
 
 groupFiles:
+  templateMetadata: f"{self.siteID}_{start}_{end}.metadata"
   groupMetaData: f"group_{groupID}_MetaData.metadata"
   eddyProCols: f"group_{groupID}_ColDefs.eddypro"
 

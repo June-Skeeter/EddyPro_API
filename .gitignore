@@ -8,3 +8,4 @@ __pycache__
 *test.ipynb
 *temp/
 *user_path_definitions.yml
+/.quarto/

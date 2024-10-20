@@ -1,12 +1,12 @@
 ;GHG_METADATA
 [Project]
-title=
-id=
-creation_date=
-last_change_date=
+title='GHG_Metadata_Template'
+id='GHG_Metadata_Template'
+creation_date=pd.to_datetime(datetime.now()).floor('s')
+last_change_date=pd.to_datetime(datetime.now()).floor('s')
 start_date=
 end_date=
-file_name=
+file_name="{self.siteID}_GHG_Metadata.metadata"
 sw_version=
 ini_version=
 
@@ -20,18 +20,18 @@ enable_processing=
 tstamp_end=
 
 [Site]
-site_name=
-site_id=
-altitude=
-latitude=
-longitude=
-canopy_height=
+site_name=self.siteID
+site_id=self.siteID
+altitude=self.altitude
+latitude=self.latitude
+longitude=self.longitude
+canopy_height=self.canopy_height
 displacement_height=
 roughness_length=
 
 [Station]
-station_name=
-station_id=
+station_name=self.siteID
+station_id=self.siteID
 
 [Timing]
 acquisition_frequency=
@@ -62,7 +62,7 @@ instr_*_ko=
 [FileDescription]
 separator=
 header_rows=
-data_label=
+data_label=Not set
 col_*_variable=
 col_*_instrument=
 col_*_measure_type=

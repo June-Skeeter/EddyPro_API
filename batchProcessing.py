@@ -23,7 +23,7 @@ def set_high_priority():
     p = psutil.Process(os.getpid())
     p.nice(psutil.HIGH_PRIORITY_CLASS)
 
-def pasteWithSubprocess(source, dest, option = 'copy',Verbose=False):
+def pasteWithSubprocess(source, dest, option = 'copy',verbose=False):
     set_high_priority()
     cmd=None
     if sys.platform.startswith("darwin"): 
@@ -38,7 +38,7 @@ def pasteWithSubprocess(source, dest, option = 'copy',Verbose=False):
             cmd.append('/s')
     if cmd:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    if Verbose==True:
+    if verbose==True:
         print(proc)
     # Copy ghg or dat files and shift timestamp in file name if needed
     # useful to get data from sever for local run, or to copy from a datadump folder to more centralized repo
@@ -70,7 +70,7 @@ def findFiles(inName,in_dir,fileInfo,checkList=[],dateRange=None):
     return(empty)
 
 class Parser():
-    def __init__(self,config=None,metaDataTemplate='None',verbose=False):
+    def __init__(self,config=None,metaDataTemplate='None',debug=False):
         if config is None:
             with open('config_files/config.yml') as yml:
                 self.config = yaml.safe_load(yml)
@@ -78,13 +78,14 @@ class Parser():
                 self.config.update(yaml.safe_load(yml))
         else:
             self.config = config
-        self.verbose = verbose
+        self.debug = debug
         self.nOut = 2
         # Define statistics to aggregate raw data by, see configuration
         self.agg = [key for key, value in self.config['monitoringInstructions']['dataAggregation'].items() if value is True]
         if metaDataTemplate != 'None':
-            self.metaDataTemplate,self.fileDescription = self.readMetaData(open(metaDataTemplate))
-            self.fileDescription.update(self.config['dat']['fileDescription'])
+            self.metaDataTemplate = self.readMetaData(open(metaDataTemplate))
+        else:
+            print('Fix here (Need MD)')
 
     def readFile(self,file):
         set_high_priority()
@@ -101,10 +102,15 @@ class Parser():
                 print(f"extraction failed for: {filepath}")
                 d_agg,metaData=None,None
                 self.ignore = []
-                pass
+                if self.debug == False:
+                    pass
+                else:
+                    print(e)
+                    n = input('Next')
+                    pass
         else:
-            d_agg, d_names = self.readData(filepath,self.fileDescription,timestamp)
             metaData = self.metaDataTemplate.copy()
+            d_agg, d_names = self.readData(filepath,metaData,timestamp)
             metaData.update(d_names)
         
         # Ignore missing data
@@ -126,79 +132,83 @@ class Parser():
             for f in subFiles:
                 ghgInventory[f.replace(base,'')]=f
             with ghgZip.open(ghgInventory['.metadata']) as f:
-                metaData,fileDescription = self.readMetaData(TextIOWrapper(f, 'utf-8'))
-            fileDescription.update(self.config['ghg'])
-            if hasattr(fileDescription, 'skip_rows') == False:
-                fileDescription['skip_rows'] = int(fileDescription['header_rows'])-1
-                fileDescription['header_rows'] = 0
+                metaData = self.readMetaData(TextIOWrapper(f, 'utf-8'))
+            if hasattr(self.pdKwargs, 'skiprows') == False:
+                self.pdKwargs['skiprows'] = int(self.pdKwargs['header'])-1
+                self.pdKwargs['header'] = 0
             with ghgZip.open(ghgInventory['.data']) as f:
-                d_agg, d_names = self.readData(f,fileDescription,timestamp)
+                d_agg, d_names = self.readData(f,metaData,timestamp)
             metaData.update(d_names)
         return(d_agg,metaData)
 
     def readMetaData(self,metaDataFile):
-        # Parse the .metadata file included in the .ghg file
-        # Or parse a userdefined template
-        # Extract file description to parse data
-        # Dump relevant metaData values to dataframe for tracking
+        # Parse the .metadata file included in the .ghg file or defined by user
+        # Extract file description to parse data and dump relevant metaData values to dataframe for tracking
         metaData = configparser.ConfigParser()
         metaData.read_file(metaDataFile)
         metaData = {key:dict(metaData[key]) for key in metaData.keys()}
-        # Isolate and parse file description for reading data files
-        fileDescription = metaData['FileDescription'].copy()
-        fileDescription['delimiter'] = self.config['delimiters'][fileDescription['separator']].encode('ascii','ignore').decode('unicode_escape')
+        # Parse info to be used as **kwarg in pd.read_csv()
+        if hasattr(self,'pdKwargs') == False:
+            self.pdKwargs = {}
+            self.pdKwargs['header'] = metaData['FileDescription']['header_rows']
+            self.pdKwargs['sep'] = self.config['delimiters'][metaData['FileDescription']['separator']].encode('ascii','ignore').decode('unicode_escape')
+        # Other info from metadata
+        self.fileDescription = metaData['FileDescription'].copy()
         # Reformat for dumping to DataFrame        
         metaData = {(k1,k2):val for k1 in metaData.keys() for k2,val in metaData[k1].items()}
-        return(metaData,fileDescription)
+        return(metaData)
     
-    def readData(self,dataFile,fileDescription,timestamp):
+    def readData(self,dataFile,metaData=None,timestamp=None):
         # read the raw high frequency data
         # parse the column names and output desired aggregation statistics for each raw data file
-        if type(fileDescription['header_rows'])==list:
-            index_col=None
+        if hasattr(self,'pdKwargs') == False:
+            self.pdKwargs = self.config['dat']['fileDescription']
+        if type(self.pdKwargs['header'])==list:
+            self.pdKwargs['index_col']=None
         else:
-            index_col=False
+            self.pdKwargs['index_col']=False
+        if hasattr(self.pdKwargs,'na_values') == False:
+            self.pdKwargs['na_values'] = self.config['intNaN']
         with warnings.catch_warnings(record=True) as w:
             # Only capture the specific ParserWarning
             warnings.simplefilter("always", category=pd.errors.ParserWarning)
-            if 'na_values' in fileDescription.keys():
-                data = pd.read_csv(dataFile,index_col=index_col,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=fileDescription['na_values'])
-            else:
-                data = pd.read_csv(dataFile,index_col=index_col,skiprows=fileDescription['skip_rows'],header=fileDescription['header_rows'],sep=fileDescription['delimiter'],na_values=self.config['intNaN'])
+            data = pd.read_csv(dataFile,**self.pdKwargs)
             if w and any(issubclass(warning.category, pd.errors.ParserWarning) for warning in w):
                 print("ParserWarning detected: Adjusting headers")
-        if fileDescription['data_label'] != 'Not set':
-            # .ghg data files contain a "DATA" label if first column which isn't needed
-            data = data.drop(data.columns[0],axis=1)
-        # Parse units from metadata if not included in headers
-        if type(fileDescription['header_rows']) != list or len(fileDescription['header_rows']) == 1:
-            unit_list = [value for key,value in fileDescription.items() if 'unit_in' in key]
-            try:
-                data.columns = [data.columns,unit_list]
-            except:
-                data = data.dropna(how='all',axis=1).copy()
-                data.columns = [data.columns,unit_list]
-                if self.verbose == True:
-                    print(f'Dropped NaN columns in {dataFile.name} to force metadata match')
-                pass
-        self.ignore = [int(key.split('_')[1])-1 for key,value in fileDescription.items() if value == 'ignore']
-        D1 = data.columns[data.isna().all()].tolist()
-        self.ignore = self.ignore+ [i for i,c in enumerate(data.columns) if c in D1 and i not in self.ignore]
-        # generate dict of column names to add back into Metadata
-        col_names = {}
-        for i,c in enumerate(data.columns.get_level_values(0)):
-            col_names[('Custom',f'col_{i+1}_header_name')] = c
-        # Generate the aggregation statistics, but only for numeric columns that are not being ignored
-        to_drop = [data.columns[i] for i in self.ignore]
-        data = data.drop(to_drop,axis=1)
-        data = data._get_numeric_data()
-        # data = data.loc[:,[c for c in data.columns if c[0] not in self.config['monitoringInstructions']['dataExclude']]]
-        data.replace([np.inf, -np.inf], np.nan, inplace=True)
-        d_agg = data.agg(self.agg)
-        d_agg['Timestamp'] = timestamp
-        d_agg.set_index('Timestamp', append=True, inplace=True)
-        d_agg = d_agg.reorder_levels(['Timestamp',None]).unstack()
-        return(d_agg,col_names)
+        if metaData is not None:
+            if self.fileDescription['data_label'] != 'Not set':
+                # .ghg data files contain a "DATA" label if first column which isn't needed
+                data = data.drop(data.columns[0],axis=1)
+            # Parse units from metadata if not included in headers
+            if type(self.pdKwargs['header']) != list or len(self.pdKwargs['header']) == 1:
+                unit_list = [value for key,value in self.fileDescription.items() if 'unit_in' in key]
+                try:
+                    data.columns = [data.columns,unit_list]
+                except:
+                    data = data.dropna(how='all',axis=1).copy()
+                    data.columns = [data.columns,unit_list]
+                    if self.debug == True:
+                        print(f'Dropped NaN columns in {dataFile.name} to force metadata match')
+                    pass
+            self.ignore = [int(key.split('_')[1])-1 for key,value in self.fileDescription.items() if value == 'ignore']
+            D1 = data.columns[data.isna().all()].tolist()
+            self.ignore = self.ignore+ [i for i,c in enumerate(data.columns) if c in D1 and i not in self.ignore]
+            # generate dict of column names to add back into Metadata
+            col_names = {}
+            for i,c in enumerate(data.columns.get_level_values(0)):
+                col_names[('Custom',f'col_{i+1}_header_name')] = c
+            # Generate the aggregation statistics, but only for numeric columns that are not being ignored
+            to_drop = [data.columns[i] for i in self.ignore]
+            data = data.drop(to_drop,axis=1)
+            data = data._get_numeric_data()
+            data.replace([np.inf, -np.inf], np.nan, inplace=True)
+            d_agg = data.agg(self.agg)
+            d_agg['Timestamp'] = timestamp
+            d_agg.set_index('Timestamp', append=True, inplace=True)
+            d_agg = d_agg.reorder_levels(['Timestamp',None]).unstack()
+            return(d_agg,col_names)
+        else:
+            return(data)
 
 class runEddyPro():
     def __init__(self,epRoot,subsetNames=['1'],priority = 'normal',debug=False):
