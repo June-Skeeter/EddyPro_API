@@ -2,7 +2,7 @@
 title: "An Application Program Interface for Automating and Streamlining Flux Processing in EddyPro&reg;"
 author: Dr. June Skeeter
 bibliography: EddyProAPI.bib
-format: docx
+format: html
 ---
 
 # Abstract

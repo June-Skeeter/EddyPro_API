@@ -4,3 +4,9 @@ project:
 
 website:
   title: "EddyPro API"
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true

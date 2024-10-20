@@ -6,8 +6,9 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="author" content="Dr.&nbsp;June Skeeter">
 
-<title>test – EddyPro API</title>
+<title>An Application Program Interface for Automating and Streamlining Flux Processing in EddyPro® – EddyPro API</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -20,41 +21,27 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
 }
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
 }
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
 }
-</style>
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
 
 
 <script src="site_libs/quarto-nav/quarto-nav.js"></script>
@@ -111,142 +98,107 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#abstract" id="toc-abstract" class="nav-link active" data-scroll-target="#abstract">Abstract</a></li>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
+  <ul class="collapse">
+  <li><a href="#running-eddypro" id="toc-running-eddypro" class="nav-link" data-scroll-target="#running-eddypro">Running Eddypro</a></li>
+  </ul></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
-
-
-
-<div id="cell-0" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> configparser</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> importlib</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> datetime <span class="im">as</span> dt</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> eddyProAPI</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>importlib.<span class="bu">reload</span>(eddyProAPI)</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>siteID <span class="op">=</span> <span class="st">'SCL'</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>eP <span class="op">=</span> eddyProAPI.eddyProAPI(runMode<span class="op">=</span><span class="dv">0</span>,siteID<span class="op">=</span>siteID)</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>f <span class="op">=</span> eP.config[<span class="st">'Paths'</span>][<span class="st">'sourceDir'</span>]<span class="op">+</span><span class="st">'/2024/07/'</span><span class="op">+</span>os.listdir(eP.config[<span class="st">'Paths'</span>][<span class="st">'sourceDir'</span>]<span class="op">+</span><span class="st">'/2024/07/'</span>)[<span class="op">-</span><span class="dv">1</span>]</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>pd.read_csv(f,<span class="op">**</span>eP.config[<span class="st">'dat'</span>][<span class="st">'fileDescription'</span>])</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="va">self</span> <span class="op">=</span> eP</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> sec,value <span class="kw">in</span> eP.GHG_Metadata_Template.items():</span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> sec <span class="op">!=</span> <span class="st">'DEFAULT'</span> <span class="kw">and</span> sec <span class="kw">not</span> <span class="kw">in</span> [<span class="st">'Instruments'</span>,<span class="st">'FileDescription'</span>]:</span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(sec)</span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>()</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> key,val <span class="kw">in</span> value.items():</span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> val <span class="op">!=</span> <span class="st">''</span>:</span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>                <span class="cf">try</span>:</span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>                    <span class="bu">print</span>(key,<span class="bu">eval</span>(val))</span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>                <span class="cf">except</span>:</span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>                    cc <span class="op">=</span> <span class="bu">compile</span>(<span class="ss">f"</span><span class="sc">{</span>val<span class="sc">}</span><span class="ss"> = input(key)"</span>,<span class="st">'&lt;string&gt;'</span>,<span class="st">'single'</span>)</span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>                    <span class="bu">print</span>(key,<span class="bu">eval</span>(cc))</span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">pass</span></span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> sec <span class="kw">in</span> [<span class="st">'Instruments'</span>,<span class="st">'FileDescription'</span>]:</span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(sec)</span>
-<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(eP.altitude)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>C:\Users\jskeeter\CANFLUX\highfreq\SCL\metadata\fileInventory.csv
-Project
-
-title GHG_Metadata_Template
-id GHG_Metadata_Template
-creation_date 2024-10-10 08:44:55
-last_change_date 2024-10-10 08:44:55
-file_name c:\Users\jskeeter\CANFLUX\EddyPro_API/SCL_GHG_Metadata.metadata
-Files
-
-Site
-
-site_name SCL
-site_id SCL
-altitude None
-latitude None
-longitude None
-canopy_height None
-Station
-
-station_name SCL
-station_id SCL
-Timing
-
-Instruments
-FileDescription
-4</code></pre>
-</div>
-</div>
-<div id="cell-1" class="cell" data-execution_count="31">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>eP.GHG_Metadata_Template</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> fnmatch</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># list(eP.GHG_Metadata_Template['Instruments'].keys())</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># fnmatch.filter(list(eP.GHG_Metadata_Template['Instruments'].keys()),'instr_*_model')</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co"># max(</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> catch(func, handle<span class="op">=</span><span class="kw">lambda</span> e : e, <span class="op">*</span>args, <span class="op">**</span>kwargs):</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> func(<span class="op">*</span>args, <span class="op">**</span>kwargs)</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">pass</span></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>[catch(<span class="kw">lambda</span>: <span class="bu">int</span>(i.split(<span class="st">'_'</span>)[<span class="dv">1</span>]))</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> fnmatch.<span class="bu">filter</span>(<span class="bu">list</span>(eP.GHG_Metadata_Template[<span class="st">'Instruments'</span>].keys()),<span class="st">'instr_*_model'</span>)</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> catch(<span class="kw">lambda</span>: <span class="bu">int</span>(i.split(<span class="st">'_'</span>)[<span class="dv">1</span>])) <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>]</span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="co"># )</span></span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co"># 'FileDescription':max([int(i.split('_')[1]) for i in fnmatch.filter(list(groupMetaData['FileDescription'].keys()),'col_*_variable')])</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="31">
-<pre><code>[]</code></pre>
-</div>
-</div>
-<div id="cell-2" class="cell" data-execution_count="27">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> catch(func, handle<span class="op">=</span><span class="kw">lambda</span> e : e, <span class="op">*</span>args, <span class="op">**</span>kwargs):</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> func(<span class="op">*</span>args, <span class="op">**</span>kwargs)</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">pass</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>eggs <span class="op">=</span> (<span class="dv">1</span>,<span class="dv">3</span>,<span class="dv">0</span>,<span class="dv">3</span>,<span class="dv">2</span>)</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>[catch(<span class="kw">lambda</span> : <span class="dv">1</span><span class="op">/</span>egg) <span class="cf">for</span> egg <span class="kw">in</span> eggs <span class="cf">if</span> catch(<span class="kw">lambda</span> : <span class="dv">1</span><span class="op">/</span>egg) <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="27">
-<pre><code>[1.0, 0.3333333333333333, 0.3333333333333333, 0.5]</code></pre>
-</div>
-</div>
-<div id="cell-3" class="cell" data-execution_count="53">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.DataFrame(index<span class="op">=</span>[<span class="dv">1</span>,<span class="dv">2</span>],data <span class="op">=</span> {(<span class="st">'A'</span>,<span class="st">'a'</span>):[<span class="dv">0</span>,<span class="dv">0</span>],(<span class="st">'B'</span>,<span class="st">'b'</span>):[<span class="dv">1</span>,<span class="dv">2</span>]})</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i,row <span class="kw">in</span> df.iterrows():</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    t <span class="op">=</span> {L:{</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        i[<span class="dv">0</span>]:<span class="bu">str</span>(v) <span class="cf">if</span> <span class="op">~</span>np.isnan(v) <span class="cf">else</span> <span class="st">'~'</span> <span class="cf">for</span> i,v <span class="kw">in</span> row[L].items() </span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        } <span class="cf">for</span> L <span class="kw">in</span> </span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>        row.index.get_level_values(<span class="dv">0</span>)</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>            }</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="bu">list</span>(t.keys()))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>['A', 'B']
-['A', 'B']</code></pre>
-</div>
-</div>
-<div id="cell-4" class="cell" data-execution_count="64">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> most_common(lst):</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">max</span>(<span class="bu">set</span>(lst), key<span class="op">=</span>lst.count)</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>lst <span class="op">=</span> [<span class="st">'a'</span>,<span class="st">'a'</span>,<span class="st">'b'</span>]</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>most_common(lst)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="64">
-<pre><code>'a'</code></pre>
-</div>
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">An Application Program Interface for Automating and Streamlining Flux Processing in EddyPro®</h1>
 </div>
 
 
 
-</main> <!-- /main -->
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Dr.&nbsp;June Skeeter </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="abstract" class="level1">
+<h1>Abstract</h1>
+<p>Eddy Covariance (EC) is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses. Processing raw EC data to calculate fluxes is computationally intensive, which poses a barrier for widespread dissemination of EC data products. One of the most popular and accessible options for flux computation is EddyPro®; a software application with graphic user interface (GUI) that allows users to process EC data and apply a variety of corrections depending on their needs. Manually defining and exciting EddyPro® runs limits the efficiency of flux processing and increases the risk of user error impacting flux estimates. An application program interface (API) was developed to help standardize and expedite processing EC data in Eddy Pro®. The API consists of two modules: the pre-processing module filters raw EC data using quality controls, generates descriptive statistics for the raw data, checks for changes in metadata (e.g., instrument separation), and groups EC data into periods common configurations for processing. The processing module then runs EddyPro® based on a user-defined configuration, which can be setup using the EddyPro GUI or by modifying one of the configuration files included with the API. The processing is executed parallel batches, to minimize computation times. Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI. The API allows for automation of EC data processing while maintaining the ability to use the EddyPro GUI to define and inspect processing configurations.</p>
+</section>
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p>Eddy Covariance (EC) is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses (e.g., CO_2). Flux estimation via EC involves applying a Reynolds Operators to high frequency (&gt;=10 Hz) measurements of 3-D winds and scalar concentrations over 30- to 60-minute intervals. This is a computationally expensive procedure, and it can be particularly time consuming when repeated over months or years worth of EC data.</p>
+<p>One of the most popular applications for processing EC data is EddyPro® <span class="citation" data-cites="noauthor_eddypro_2021"><span>“<span>EddyPro</span>® <span>Software</span>”</span> (<a href="#ref-noauthor_eddypro_2021" role="doc-biblioref">2021</a>)</span>. The application is designed to provide easy, accurate EC flux computations <span class="citation" data-cites="li-cor_inc_eddypro_2021">LI-COR (<a href="#ref-li-cor_inc_eddypro_2021" role="doc-biblioref">2021</a>)</span>. It has a graphic user interface (GUI) that allows apply a standard processing pipeline or selectively apply more advanced filtering and correction procedures as needed. The backend of the processing pipeline is executed in FORTRAN, and EddyPro outputs half-hourly or hourly flux estimates and other supplemental data as human-readable .csv files.</p>
+<p>While the EddyPro software application has made processing EC data more user friendly, it is still a tedious, and time consuming procedure. The user is required to manually initiate runs in the GUI and whenever data need to be processed. This can leave considerable room for errors and divergence of processing procedures between sites and time periods when processing is conducted by multiple or inexperienced users in a research group (e.g., graduate students).</p>
+<p>Reprocessing is often required either to correct mistakes or test out different calculation and correction procedures. However, the GUI processes files sequentially and it can take days to execute when processing multiple years worth of data for a single site. When applying computationally expensive (e.g., <span class="citation" data-cites="ibrom_strong_2007">Ibrom et al. (<a href="#ref-ibrom_strong_2007" role="doc-biblioref">2007</a>)</span>; <span class="citation" data-cites="fratini_relative_2012">Fratini et al. (<a href="#ref-fratini_relative_2012" role="doc-biblioref">2012</a>)</span>) which are sensitive to changes in site metadata to long periods of data, the GIU can be prone to crashing with cryptic error messages.</p>
+<p>Eddy Covariance data should be processed in batches over time-periods with similar conditions (e.g., seasons) and common configurations (e.g., instrument separation). To allow sufficient data for spectral determining spectral corrections. But when processing longer-time periods there substantial room for reduction of processing times via parallel computing.</p>
+<p>The EddyPro API (Application Program Interface) is a python wrapper for the EddyPro software package that allows for automation and parallel processing of flux estimation procedures. Processing procedures can be configured using the EddyPro GUI or a text editor then dynamically implemented via the API to set the run period(s) and batch the data for processing in parallel.</p>
+</section>
+<section id="methods" class="level1">
+<h1>Methods</h1>
+<p>The API consists of two parts: a pre-processing module, and the execution module.</p>
+<p>The pre-processing module can inspect the raw data prior to flux computation. The pre-processing module checks the metadata where available (in .ghg files), detects and tracks changes to instrumentation, orientation, calibration coefficients. The pre-processing can also be used to “overwrite” metadata, e.g., to correct for improperly measured sensor separation. The pre-processing procedures help to identify periods for which fluxes should not be calculated (too much missing data) and define batching procedures to ensure consistent setup within processing batches.</p>
+<ol type="1">
+<li>Read high frequency data in .ghg or text (.csv, .dat, etc.) format.</li>
+</ol>
+<ul>
+<li><p>This will parse all data, month by month for the BB site in the highfreq folder using four cores to speed up processing time.</p></li>
+<li><p><strong>If .ghg data</strong></p>
+<ul>
+<li>Extract the data and read relevant sub-files</li>
+<li>Calculate raw half-hourly means of all input data</li>
+<li>Parse and track the metadata, inspecting for changes
+<ul>
+<li>Update/correct metadata from a user-defined template as necessary</li>
+</ul></li>
+</ul></li>
+<li><p><strong>If other .data files</strong></p></li>
+</ul>
+<ol start="2" type="1">
+<li>Create metadata template files</li>
+</ol>
+<section id="running-eddypro" class="level3">
+<h3 class="anchored" data-anchor-id="running-eddypro">Running Eddypro</h3>
+<p>Create a .eddypro template, either using the GUI, editing one of the templates included here. Then call EddyPro to run over a given time period - the API will handle updating the time period specific settings and partitioning the outputs by relevant period. Where necessary, the API will separate cospectral inputs/outputs by accordingly.</p>
+
+
+
+</section>
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-noauthor_eddypro_2021" class="csl-entry" role="listitem">
+<span>“<span>EddyPro</span>® <span>Software</span>.”</span> 2021. LI-COR; Infrastructure for Measurements of the European Carbon Cycle consortium. <a href="https://www.licor.com/env/support/EddyPro/software.html">https://www.licor.com/env/support/EddyPro/software.html</a>.
+</div>
+<div id="ref-fratini_relative_2012" class="csl-entry" role="listitem">
+Fratini, Gerardo, Andreas Ibrom, Nicola Arriga, George Burba, and Dario Papale. 2012. <span>“Relative Humidity Effects on Water Vapour Fluxes Measured with Closed-Path Eddy-Covariance Systems with Short Sampling Lines (Vol 165, Pg 53, 2012).”</span> <em>Agricultural and Forest Meteorology</em> 166 (December): 234–34. <a href="https://doi.org/10.1016/j.agrformet.2012.10.013">https://doi.org/10.1016/j.agrformet.2012.10.013</a>.
+</div>
+<div id="ref-ibrom_strong_2007" class="csl-entry" role="listitem">
+Ibrom, Andreas, Ebba Dellwik, Henrik Flyvbjerg, Niels Otto Jensen, and Kim Pilegaard. 2007. <span>“Strong Low-Pass Filtering Effects on Water Vapour Flux Measurements with Closed-Path Eddy Correlation Systems.”</span> <em>Agricultural and Forest Meteorology</em> 147 (3-4): 140–56. <a href="https://doi.org/10.1016/j.agrformet.2007.07.007">https://doi.org/10.1016/j.agrformet.2007.07.007</a>.
+</div>
+<div id="ref-li-cor_inc_eddypro_2021" class="csl-entry" role="listitem">
+LI-COR, Inc. 2021. <span>“<span>EddyPro</span>® Version 7.0 <span>Help</span> and <span>User</span>’s <span>Guide</span>.”</span> LI-COR, Inc. Lincoln, NE. <a href="https://www.licor.com/env/support/EddyPro/topics/introduction.html#top">https://www.licor.com/env/support/EddyPro/topics/introduction.html#top</a>.
+</div>
+</div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {
