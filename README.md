@@ -4,9 +4,9 @@ Written and maintained by Dr. June Skeeter under an open copyright license&copy;
 
 # About
 
-[EddyPro&reg;](https://www.licor.com/env/support/EddyPro/topics/introduction.html#top) is a popular software application for processing high frequency Eddy Covariance (EC) data via a graphic user interface (GUI).  This application program interface (API) can be used to automate and parallelize processing with Eddy Pro&reg; to mininmize computation times.
+[EddyPro&reg;](https://www.licor.com/env/support/EddyPro/topics/introduction.html#top) is a popular software application for processing high frequency Eddy Covariance (EC) data via a graphic user interface (GUI).  This application program interface (API) can be used to automate and parallelize processing with Eddy Pro&reg; to minimize computation times.
 
-## Workflow
+<!-- ## Workflow
 
 There are two main things the API does.
 
@@ -26,7 +26,8 @@ There are two main things the API does.
         * e.g., if sensor separation changed, the data before and after the change would be run as separate groups for the purpose of generating representative spectral corrections
 
 
-2. **Running EddyPro&reg**; takes the results of the pre-processing routine and uses it to generate and execute batch runs of EddyPro in parallel.  The outputs are then stitched together into homogenous files and can be output into binary Biomet.Net database format if desired.
+2. **Running EddyPro&reg**; takes the results of the pre-processing routine and uses it to generate and execute batch runs of EddyPro in parallel.  The outputs are then stitched together into homogenous files and can be output into binary Biomet.Net database format if desired. -->
+
 
 # Installation & Setup
 
