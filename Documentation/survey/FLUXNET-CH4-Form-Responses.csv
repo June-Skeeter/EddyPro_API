@@ -1,0 +1,45 @@
+Timestamp,What programming language do you use most frequently?,What programming languages are you comfortable with?,"What software do you use to process your high frequency (e.g., 10-20 Hz) flux data (examples could include: EddyPro, Eddy4R, in-house software, etc.)","What approache(s) do you use for data post-processing of 30-min fluxes (for example: TOVI, REddyProc, PyFluxPro, ONEFlux, etc.)"
+10/20/2024 21:31:29,R,R,,
+10/20/2024 21:47:24,Matlab,Matlab,in-house software,in-house software
+10/20/2024 22:06:33,Python,"Python, R, Matlab, Fortran, Julia",EddyPro,Custom code
+10/20/2024 22:10:46,Python,"Python, R, Matlab",EddyPro,Tobi
+10/20/2024 22:15:44,Matlab,Matlab,EddyPro,REddyProc
+10/20/2024 22:49:00,R,R,EddyPro,"REddyProc, TEA"
+10/20/2024 23:22:16,R,R,EddyPro,REddyProc
+10/20/2024 23:43:06,Matlab,"Matlab, Fortran","EddyPro, in-house", REddyProc
+10/21/2024 0:31:52,Python,"Python, R","EddyPro, Rstudio",
+10/21/2024 1:12:07,Python,"Python, R",EddyPro,REddyProc
+10/21/2024 1:26:28,R,"Python, R","I actually have no experience working with high frequency flux data, but I'm ready to learn about it.",Not yet
+10/21/2024 1:34:00,R,R,EddyPro,REddyProc
+10/21/2024 2:36:47,Python,Python,,
+10/21/2024 4:08:40,Python,Python,EddyPro,My own python code based on literature and experience
+10/21/2024 4:08:44,R,"Python, R",EddyPro,REddyProc
+10/21/2024 5:00:54,Matlab,"R, Matlab, Fortran",In-house,In-house
+10/21/2024 5:32:23,R,"R, Matlab",EddyPro,REddyProc
+10/21/2024 5:58:27,Python,Python,,
+10/21/2024 5:59:02,Python,Python,aucun,aucun
+10/21/2024 6:14:26,Python,Python,,
+10/21/2024 6:16:26,R,"Python, R, Matlab",EddyPro,REddyProc
+10/21/2024 6:21:56,Matlab,Matlab,EddyPro,REddyProc
+10/21/2024 6:26:13,R,R,EddyPro,"REddyProc, Neural Networks and in-house software for specific cases "
+10/21/2024 6:26:16,Matlab,"Python, Matlab",in-house Matlab,in-house Matlab
+10/21/2024 6:28:34,Python,"Python, Fortran",EddyPro,To be determined
+10/21/2024 6:31:02,R,R,EddyPro,
+10/21/2024 6:31:54,R,R,NA,NA
+10/21/2024 6:33:53,R,R,EddyPro,-
+10/21/2024 6:36:06,Python,"Python, R, Fortran",,
+10/21/2024 6:51:22,Matlab,"R, Matlab",EddyPro,REddyProc
+10/21/2024 6:59:37,R,R,EddyPro,REddyProc
+10/21/2024 7:14:46,R,R,EddyPro,
+10/21/2024 7:27:12,Matlab,Matlab,EddyPro; in-house software,
+10/21/2024 7:29:47,Python,"Python, R",,
+10/21/2024 7:55:41,Matlab,Python,Matlab,Custom Biomet Code
+10/21/2024 8:07:44,R,R,EddyPro,REddyProc
+10/21/2024 8:31:52,Python,"Python, Matlab",EddyPro,REddyProc
+10/21/2024 8:55:49,R,"Python, R",EddyPro,REddyProc/ custom
+10/21/2024 8:58:13,Python,"Python, Matlab",Python,REdddyProc
+10/21/2024 8:59:39,R,"R, Matlab",R,own R/MatLab scripts
+10/21/2024 9:10:24,R,R,EddyPro,RFlux + custom gap filling for tropical conditions
+10/21/2024 9:14:17,Python,Python,,
+10/21/2024 9:24:36,R,"Python, R, Matlab",Eddy4R,REddyProc and own pipelines
+10/21/2024 9:32:21,R,R,I am new to it,REddyProc
