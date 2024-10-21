@@ -14,6 +14,13 @@
     "text": "About EddyPro®\n“EddyPro® Software” (2021) is one of the most popular applications for processing Eddy Covariance (EC) data.\n\nIt designed to provide easy, accurate EC flux computations LI-COR (2021).\nOpen source software with a graphic user interface (GUI)\n\nInterfaces with a processing pipeline is executed in FORTRAN\nBased on the “ECO2S” (2011) package"
   },
   {
+    "objectID": "Documentation/about.html#who-uses-eddypro",
+    "href": "Documentation/about.html#who-uses-eddypro",
+    "title": "An Application Program Interface for Automating and Parallelizing EddyPro®",
+    "section": "Who Uses EddyPro?",
+    "text": "Who Uses EddyPro?\n\n\n\n\n\n\n\n\n\n26 of the 35 respondents who answered the question, indicated that they use EddyPro®."
+  },
+  {
     "objectID": "Documentation/about.html#advantages-of-eddypro",
     "href": "Documentation/about.html#advantages-of-eddypro",
     "title": "An Application Program Interface for Automating and Parallelizing EddyPro®",
@@ -75,12 +82,5 @@
     "title": "An Application Program Interface for Automating and Parallelizing EddyPro®",
     "section": "References",
     "text": "References\n\n\n“ECO2S.” 2011. Infrastructure for Measurements of the European Carbon Cycle consortium. http://gaia.agraria.unitus.it/eco2s.\n\n\n“EddyPro® Software.” 2021. LI-COR; Infrastructure for Measurements of the European Carbon Cycle consortium. https://www.licor.com/env/support/EddyPro/software.html.\n\n\nLI-COR, Inc. 2021. “EddyPro® Version 7.0 Help and User’s Guide.” LI-COR, Inc. Lincoln, NE. https://www.licor.com/env/support/EddyPro/topics/introduction.html#top.\n\n\n\n\n\nSee the repo here"
-  },
-  {
-    "objectID": "Documentation/about.html#who-uses-eddypro",
-    "href": "Documentation/about.html#who-uses-eddypro",
-    "title": "An Application Program Interface for Automating and Parallelizing EddyPro®",
-    "section": "Who Uses EddyPro?",
-    "text": "Who Uses EddyPro?"
   }
 ]
