@@ -30,6 +30,35 @@ bibliography: EddyProAPI.bib
     * Interfaces with a processing pipeline is executed in FORTRAN
     * Based on the @noauthor_eco2s_2011 package
 
+## Who Uses EddyPro?
+
+```{python}
+import matplotlib.pyplot as plt
+import pandas as pd
+pth = 'survey/FLUXNET-CH4-Form-Responses.csv'
+df=pd.read_csv(pth)
+df = df.fillna('Not Specified')
+g = 'What software do you use to process your high frequency (e.g., 10-20 Hz) flux data (examples could include: EddyPro, Eddy4R, in-house software, etc.)'
+df[g]=df[g].replace({"I actually have no experience working with high frequency flux data, but I'm ready to learn about it.":'New User, No Preference Yet',
+                     "I am new to it":'New User, No Preference Yet',
+                     'EddyPro, Rstudio':'EddyPro + In-house',
+                     'EddyPro, in-house':'EddyPro + In-house',
+                     'EddyPro; in-house software':'EddyPro + In-house',
+                     'in-house Matlab':'In-house',
+                     'in-house software':'In-house',
+                     'R':'In-house',
+                     'Python':'In-house',
+                     'Matlab':'In-house',
+                     'aucun':'Not Specified'
+                     })
+summary = df.groupby(g).count()
+
+
+plt.barh(summary['Timestamp'].sort_values().index,
+summary['Timestamp'].sort_values())
+plt.title('What software do you use to process your high frequency flux data? (Survey responses)')
+a=1
+```
 
 ## Advantages of EddyPro&reg;
 
