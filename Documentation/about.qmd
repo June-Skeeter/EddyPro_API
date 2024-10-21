@@ -15,6 +15,7 @@ format:
         slide-number: true
         show-slide-number: all
         pdfMaxPagesPerSlide: 1
+        footer: <a href="https://github.com/CANFLUX/EddyPro_API">Find the repo here</a>
 bibliography: EddyProAPI.bib
 ---
 
@@ -67,14 +68,57 @@ The Application Program Interface (API) can be used to automate and parallelize 
 
 The Application Program Interface (API) can be help standardize flux processing. 
 
-* Template EddyPro&reg; files serve as the basis for a project
-    * Users can view/modify options using the EddyPro&reg; GUI or a text editor
-    * Viewing .eddypro files in a text editor allows for quick differentiation
 
+:::: {.columns}
 
-![](images/Compare.png)
+::: {.column width="50%"}
+
+* Template .eddypro files serve as the basis for a project
+    * View/modify options using the GUI or a text editor
+* Works with LICOR (GHG) or Cambpbell (TOA5) files
+
+:::
+
+::: {.column width="50%"}
+
+![Allows for quick differentiation](images/Compare.png)
+
+:::
+::::
+
+## How does it work?
+
+There are two main routines in the API which will be run in sequence when calling the script.
+
+```{bash}
+cd Path\To\eddyProAPI
+.\.venv\Scripts\activate
+python .\eddyProAPI.py --siteID ID --fileType ghg --dateRange 2024-06-01 2024-08-31
+```
+
+## Pre-processing
+
+* Inspect for changes in metadata
+    * Identify groups of common configuration
+* Parses the high frequency data to generate descriptive statistics
+    * Optional pre-filtering to exclude bad data
+* Generate biomet and dynamic metadata files on-the-fly
+    * Reads Biomet.Net database files
+    
+## Processing
+
+* Runs EddyPro&reg; over the desired time period
+    * Use a template .eddypro file to ensure standardized processing
+    * Appended run-specific information (inputs, directories, etc.)
+* Executes raw Data processing in parallel
+* Flux processing and correction applied on a per-group basis
 
 ## More Information
+
+This project is still under development.
+
+* I am looking for interested users to help with Beta testing
+
 
 ## References
 

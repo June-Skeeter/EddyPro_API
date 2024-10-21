@@ -55,7 +55,7 @@ defaultArgs = {
     'biometUser':False,
     'metaDataUpdates':'None',
     'lowMemory':True,
-    'sampleFile':None
+    'sampleFile':'None'
     }
 
 class eddyProAPI():
@@ -292,7 +292,7 @@ class eddyProAPI():
                             if 'TOA5' in f.readline():
                                 self.fileType = 'TOA5'
                     print(f'Auto-determined filetype: {self.fileType}')
-                if self.fileType != 'ghg' and self.metaDataTemplate == 'None':
+                if self.fileType.lower() != 'ghg' and self.metaDataTemplate == 'None':
                     # Parser = batchProcessing.Parser(self.config,self.metaDataTemplate,debug=self.debug)
                     # df = (Parser.readData(dir+'/'+[f for f in fileList if f.endswith(self.fileType)][0]))
                     sys.exit('Give valid metadata file')
