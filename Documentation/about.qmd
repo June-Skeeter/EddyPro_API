@@ -35,6 +35,7 @@ bibliography: EddyProAPI.bib
 ```{python}
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 pth = 'survey/FLUXNET-CH4-Form-Responses.csv'
 df=pd.read_csv(pth)
 df = df.fillna('Not Specified')
@@ -51,14 +52,19 @@ df[g]=df[g].replace({"I actually have no experience working with high frequency 
                      'Matlab':'In-house',
                      'aucun':'Not Specified'
                      })
+df = df.loc[df[g]!='Not Specified']
 summary = df.groupby(g).count()
 
 
 plt.barh(summary['Timestamp'].sort_values().index,
 summary['Timestamp'].sort_values())
 plt.title('What software do you use to process your high frequency flux data? (Survey responses)')
-a=1
+N = df.shape[0]
+EP_N = df.loc[df[g].str.contains('EddyPro')].shape[0]
+pct = EP_N/N
 ```
+
+`{python} EP_N` of the `{python} N` respondents who answered the question, indicated that they use EddyPro&reg;.
 
 ## Advantages of EddyPro&reg;
 
