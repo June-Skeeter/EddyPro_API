@@ -60,20 +60,20 @@
     "href": "Documentation/about.html#processing",
     "title": "An Application Program Interface for Automating and Parallelizing EddyPro®",
     "section": "Processing",
-    "text": "Processing\n\nRuns EddyPro® over the desired time period\n\nUse a template .eddypro file to ensure standardized processing\nAppended run-specific information (inputs, directories, etc.)\n\nExecutes raw Data processing in parallel\nFlux processing and correction applied on a per-group basis"
+    "text": "Processing\n\nRuns EddyPro® over the desired time period\n\nUse a template .eddypro file to ensure standardized processing\nAppended run-specific information (inputs, directories, etc.)\n\nExecutes raw Data processing in parallel\nFlux processing and correction applied on a per-group basis\nDump outputs to Biomet.Net database files"
   },
   {
-    "objectID": "Documentation/about.html#more-information",
-    "href": "Documentation/about.html#more-information",
+    "objectID": "Documentation/about.html#whats-next",
+    "href": "Documentation/about.html#whats-next",
     "title": "An Application Program Interface for Automating and Parallelizing EddyPro®",
-    "section": "More Information",
-    "text": "More Information\nThis project is still under development.\n\nI am looking for interested users to help with Beta testing"
+    "section": "What’s next?",
+    "text": "What’s next?\nThis project is still under development.\n\nComprehensive documentation page will be available in the coming weeks\n\nBasic usage instructions can be found on the repo page\n\nI am looking for interested users to help with Beta testing!\n\nPlease reach out if you would like to try it out: june.skeeter@nrcan-rncan.gc.ca"
   },
   {
     "objectID": "Documentation/about.html#references",
     "href": "Documentation/about.html#references",
     "title": "An Application Program Interface for Automating and Parallelizing EddyPro®",
     "section": "References",
-    "text": "References\n\n\n“ECO2S.” 2011. Infrastructure for Measurements of the European Carbon Cycle consortium. http://gaia.agraria.unitus.it/eco2s.\n\n\n“EddyPro® Software.” 2021. LI-COR; Infrastructure for Measurements of the European Carbon Cycle consortium. https://www.licor.com/env/support/EddyPro/software.html.\n\n\nLI-COR, Inc. 2021. “EddyPro® Version 7.0 Help and User’s Guide.” LI-COR, Inc. Lincoln, NE. https://www.licor.com/env/support/EddyPro/topics/introduction.html#top.\n\n\n\n\n\nFind the repo here"
+    "text": "References\n\n\n“ECO2S.” 2011. Infrastructure for Measurements of the European Carbon Cycle consortium. http://gaia.agraria.unitus.it/eco2s.\n\n\n“EddyPro® Software.” 2021. LI-COR; Infrastructure for Measurements of the European Carbon Cycle consortium. https://www.licor.com/env/support/EddyPro/software.html.\n\n\nLI-COR, Inc. 2021. “EddyPro® Version 7.0 Help and User’s Guide.” LI-COR, Inc. Lincoln, NE. https://www.licor.com/env/support/EddyPro/topics/introduction.html#top.\n\n\n\n\n\nSee the repo here"
   }
 ]

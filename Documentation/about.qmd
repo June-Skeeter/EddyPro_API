@@ -15,7 +15,7 @@ format:
         slide-number: true
         show-slide-number: all
         pdfMaxPagesPerSlide: 1
-        footer: <a href="https://github.com/CANFLUX/EddyPro_API">Find the repo here</a>
+        footer: <a href="https://github.com/CANFLUX/EddyPro_API">See the repo here</a>
 bibliography: EddyProAPI.bib
 ---
 
@@ -112,12 +112,17 @@ python .\eddyProAPI.py --siteID ID --fileType ghg --dateRange 2024-06-01 2024-08
     * Appended run-specific information (inputs, directories, etc.)
 * Executes raw Data processing in parallel
 * Flux processing and correction applied on a per-group basis
+* Dump outputs to Biomet.Net database files
 
-## More Information
+## What's next?
 
 This project is still under development.
 
-* I am looking for interested users to help with Beta testing
+* Comprehensive documentation page will be available in the coming weeks
+    * Basic usage instructions can be found on the [repo page](https://github.com/CANFLUX/EddyPro_API)
+
+* I am looking for interested users to help with Beta testing!
+    * Please reach out if you would like to try it out: june.skeeter@nrcan-rncan.gc.ca
 
 
 
