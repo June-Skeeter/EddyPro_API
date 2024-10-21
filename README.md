@@ -37,7 +37,7 @@ For now, the API will **only** work on windows.  There are plans to expand to ma
 2. Clone the repository
 
 ```{bash}
-git clone --recurse-submodules https://github.com/CANFLUX/
+git clone --recurse-submodules https://github.com/CANFLUX/EddyPro_API
 ```
 
 3. Run the installation routine 
