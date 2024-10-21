@@ -61,12 +61,13 @@ stringTags:
   groupID: f"group_{groupID}_"
 intNaN: -9999
 
-# templates:
-#   variableList: ini_files/VariableNames.ini
-
 delimiters:
+  # Valid delimiters that EddyPro can parse and corresponding asci representation
   comma: ','
   tab: '\t'
+  semicolon: ';'
+  space: ' '
+
 biom_timestamp:
   name: TIMESTAMP_1
   format: '%Y-%m-%d %H%M'

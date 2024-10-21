@@ -1,16 +1,20 @@
-ghg:
+GHG:
   extension: 'ghg'
+  tstamp_end: False
   # Regex search for dates in filename
   search: '([0-9]{4}\-[0-9]{2}\-[0-9]{2}T[0-9]{6})'
   format: '%Y-%m-%dT%H%M%S'
   ep_date_pattern: yyyy-mm-ddTHHMM??
 
-dat:
+
+TOA5:
   extension: 'dat'
+  tstamp_end: False
   search: ([0-9]{4}\_[0-9]{2}\_[0-9]{2}\_[0-9]{4})
   format: '%Y_%m_%d_%H%M'
   ep_date_pattern: yyyy_mm_dd_HHMM
   fileDescription:
+    sep: ','
     # Kwargs for reading data
     na_values: 
     - NAN

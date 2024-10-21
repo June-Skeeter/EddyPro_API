@@ -55,6 +55,7 @@ defaultArgs = {
     'biometUser':False,
     'metaDataUpdates':'None',
     'lowMemory':True,
+    'sampleFile':None
     }
 
 class eddyProAPI():
@@ -171,6 +172,71 @@ class eddyProAPI():
             else:
                 setattr(self, key,pd.DataFrame())            
 
+        if self.sampleFile != 'None':
+            self.sampleFile = pd.read_csv(self.sampleFile,**self.config[self.fileType]['fileDescription'])
+            self.makeMetaDataTemplate()
+
+    def makeMetaDataTemplate(self):
+        metaData = configparser.ConfigParser()
+        template = os.path.dirname(os.path.realpath(__file__))+'/Templates/InstrumentDefualts/'
+        for sec,value in self.GHG_Metadata_Template.items():
+            if sec != 'DEFAULT' and sec not in metaData.sections():
+                metaData.add_section(sec)
+            if sec != 'DEFAULT' and sec not in ['Instruments','FileDescription']:
+                
+                # for key,val in value.items():
+                #     if val != '':
+                #         self.metaData.set(sec, key, eval(val))
+                pass
+            elif sec == 'Instruments':
+            #     fmt = ' '.join([f.split('.')[0] for f in os.listdir(os.path.abspath(template+'Sonic/'))])
+            #     a = input(fmt+'\nChoose the appropriate sonice anemomenter from the list above:')
+            #     tmp = configparser.ConfigParser()
+            #     tmp.read(os.path.abspath(template+'Sonic/'+a+'.metadata'))
+            #     for key,val in tmp['Instruments'].items():
+            #         metaData.set(sec, key, str(eval(val)))
+                
+            #     fmt = ' '.join([f.split('.')[0] for f in os.listdir(os.path.abspath(template+'IRGA/'))])
+            #     N = int(input('How many IRGAs [1-3]?'))
+            #     for n in range(1,N+1):
+            #         a = input(fmt+f'\nChoose IRGA {n} from the list above:')
+            #         tmp = configparser.ConfigParser()
+            #         tmp.read(os.path.abspath(template+'IRGA/'+a+'.metadata'))
+            #         for key,val in tmp['Instruments'].items():
+            #             metaData.set(sec, key.replace('_*_',f'_{str(n+1)}_'), str(eval(val)))
+                pass
+            elif sec == 'FileDescription':
+                col_md = []
+                for key,val in value.items():
+                    if '_*_' not in key:
+                        metaData.set(sec, key,str(eval(val)))
+                    else:
+                        col_md.append(key)
+
+                for i,c in enumerate(self.sampleFile.columns):
+                    from IPython.display import display
+                    import ipywidgets as widgets
+
+                    # Create a dropdown widget
+                    dropdown = widgets.Dropdown(
+                        options=[' ', 'Option 1', 'Option 2', 'Option 3'],
+                        value=' ',
+                        description='Choose an option:',
+                    )
+
+                    # Display the dropdown
+                    display(dropdown)
+                    v = dropdown.value
+                    while v == ' ':
+                        v = dropdown.value
+                    print(dropdown.value)
+
+                    # print('Enter metadata for columns:')
+                    # print(c)
+                    # i = input('a')
+
+    
+
     def resetInventory(self):
         RESET = input(f"WARNING!! You are about to complete a reset:\ntype RESET to continue, provide any other input + enter to exit the application \n\n")
         if RESET.upper() == 'RESET':
@@ -186,8 +252,6 @@ class eddyProAPI():
         mainTime = time.time()
         self.searchRawDir()
         self.readFiles()
-        if self.metaDataTemplate == 'None' and self.fileType != 'ghg':
-            self.makeMetaDataFile()
         if self.metaDataUpdates != 'None':
             print('Applying Manual Metadata Adjustments')
             self.userMetaDataUpdates() 
@@ -211,6 +275,7 @@ class eddyProAPI():
             for dir, _, fileList in os.walk(search):
                 # Exclude files that have already been processed from fileList
                 if 'source' in self.fileInventory.columns:
+                    print(self.fileInventory.index)
                     source_list = self.fileInventory.loc[((self.fileInventory.index>=self.dateRange.min())&
                                                           (self.fileInventory.index<=self.dateRange.max())),'source'].values
                     source_names = [os.path.basename(f) for f in source_list]
@@ -220,13 +285,18 @@ class eddyProAPI():
                 if self.fileType == 'auto':
                     fileTypes = [f.split('.')[-1] for f in fileList]
                     self.fileType = max(set(fileTypes), key=fileTypes.count)
+                    if self.fileType == 'dat':
+                        testFile = [f for f in fileList if f.endswith(self.fileType)]
+                        testFile = testFile[max(0,len(testFile)-2)]
+                        with open(testFile,'r') as f:
+                            if 'TOA5' in f.readline():
+                                self.fileType = 'TOA5'
                     print(f'Auto-determined filetype: {self.fileType}')
-                if self.fileType != '.ghg' and self.metaDataTemplate == 'None':
-                    print('A')
-                    Parser = batchProcessing.Parser(self.config,self.metaDataTemplate,debug=self.debug)
-                    df = (Parser.readData(dir+'/'+[f for f in fileList if f.endswith(self.fileType)][0]))
-                    sys.exit()
-                fileInfo = self.config[self.fileType]
+                if self.fileType != 'ghg' and self.metaDataTemplate == 'None':
+                    # Parser = batchProcessing.Parser(self.config,self.metaDataTemplate,debug=self.debug)
+                    # df = (Parser.readData(dir+'/'+[f for f in fileList if f.endswith(self.fileType)][0]))
+                    sys.exit('Give valid metadata file')
+                fileInfo = self.config[self.fileType.upper()]
                 fileInfo['searchTag'] = self.searchTag
                 fileInfo['excludeTag'] = self.genericID
                 fileInfo['timeShift'] = self.timeShift
@@ -411,7 +481,7 @@ class eddyProAPI():
         for groupID,row in self.configurationGroups.loc[:,pd.IndexSlice[:,:,('mean','first')]].iterrows():
             # Dump the group's metadata values to a dict while filling NaN
             groupMetaData = {L:{i[0]:v if type(v) == str else str(v) if ~np.isnan(v) else self.config['stringTags']['NaN'] for i,v in row[L].items()} for L in row.index.get_level_values(0).unique()}
-            self.makeMetadataFiles(groupMetaData,groupID)
+            self.makeGouptMetaDataFile(groupMetaData,groupID)
         self.filterData()        
         temp = self.fileInventory[list(groupLabels.columns)+['file_prototype']].groupby(list(groupLabels.columns)).agg(['first'])
         temp.columns = pd.MultiIndex.from_product([['Custom']]+temp.columns.levels)
@@ -419,7 +489,7 @@ class eddyProAPI():
         ptype = ('Custom','file_prototype','first')
         self.saveMetadataFiles()
 
-    def makeMetadataFiles(self,groupMetaData,groupID):
+    def makeGouptMetaDataFile(self,groupMetaData,groupID):
         # Creates two files
         #   1) A .metadata file representative of all non-dynamic values
         #   2) A .eddypro file representing the relevant column numbers in the .dat(a) files
@@ -437,14 +507,15 @@ class eddyProAPI():
                 if section in groupMetaData and key in groupMetaData[section]:
                     metaDataFile[section][key] = groupMetaData[section][key]
                 elif section not in groupMetaData:
-                    val = self.GHG_Metadata_Template[section][key]
-                    if val != '':
-                        try:
-                            metaDataFile[section][key] = eval(val)
-                        except:
-                            cc = compile(f"{val} = input(key)",'<string>','single')
-                            metaDataFile[section][key] = eval(cc)
-                            pass
+                    print(f'Missing metadata section {section} may need to be fixed?')
+                    # val = self.GHG_Metadata_Template[section][key]
+                    # if val != '':
+                    #     # try:
+                    #     metaDataFile[section][key] = eval(val)
+                    #     # except:
+                    #     #     cc = compile(f"{val} = input(key)",'<string>','single')
+                    #     #     metaDataFile[section][key] = eval(cc)
+                    #     #     pass
                 else:
                     orderedKeys.append(key)
             for i in range(dynamicVals[section]):

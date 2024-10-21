@@ -1,0 +1,82 @@
+---
+title: "An Application Program Interface for Automating and Parallelizing EddyPro&reg;"
+author:
+    - name: Dr. June Skeeter
+      affiliations:
+        - name: Natural Resources Canada
+format: 
+    revealjs:
+        theme: default
+        scrollable: true
+        controls: true
+        navigation-mode: linear
+        controls-layout: bottom-right
+        controls-tutorial: true
+        slide-number: true
+        show-slide-number: all
+        pdfMaxPagesPerSlide: 1
+bibliography: EddyProAPI.bib
+---
+
+
+## About EddyPro&reg;
+
+
+@noauthor_eddypro_2021 is one of the most popular applications for processing Eddy Covariance (EC) data.
+
+* It designed to provide easy, accurate EC flux computations @li-cor_inc_eddypro_2021.
+* Open source software with a graphic user interface (GUI)
+    * Interfaces with a processing pipeline is executed in FORTRAN
+    * Based on the @noauthor_eco2s_2011 package
+
+
+## Advantages of EddyPro&reg;
+
+
+The GUI makes flux processing accessible.
+
+* Point and click processing without need for coding
+* Users can see the wide range of methods options available
+    * Links to comprehensive documentation
+* Works great for processing a single season of EC data
+
+## Disadvantages of EddyPro&reg;
+
+Point and click processing becomes a bottle.
+
+* New runs must be initiated each time more data comes in
+    + Ample room for error when conducted by inexperienced users (e.g., research assistants)
+    + Leads to delays in processing
+* Long records take a long time to process, users may avoid:
+    + Testing alternate methods 
+    + Flux recalculation
+
+
+## How the API Can Help?
+
+The Application Program Interface (API) can be used to automate and parallelize flux processing. 
+
+* Call the API from command line, a python script, or run in a Jupyter Notebook
+    * Schedule runs at regular intervals as new data come in
+    * Setup multiple runs to compare processing methods
+* API will process longer in parallel to expedite processing
+    * Can reduce processing time by a quarter or more
+
+
+## How the API Can Help?
+
+The Application Program Interface (API) can be help standardize flux processing. 
+
+* Template EddyPro&reg; files serve as the basis for a project
+    * Users can view/modify options using the EddyPro&reg; GUI or a text editor
+    * Viewing .eddypro files in a text editor allows for quick differentiation
+
+
+![](images/Compare.png)
+
+## More Information
+
+## References
+
+::: {#refs}
+:::
