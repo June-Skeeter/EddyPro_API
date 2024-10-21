@@ -1,0 +1,58 @@
+---
+title: "An Application Program Interface for Automating and Streamlining Flux Processing in EddyPro&reg;"
+author: Dr. June Skeeter
+bibliography: EddyProAPI.bib
+format: html
+---
+
+# Abstract
+
+Eddy Covariance (EC) is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses.  Processing raw EC data to calculate fluxes is computationally intensive, which poses a barrier for widespread dissemination of EC data products.  One of the most popular and accessible options for flux computation is EddyPro&reg;; a software application with graphic user interface (GUI) that allows users to process EC data and apply a variety of corrections depending on their needs.  Manually defining and exciting EddyPro&reg; runs limits the efficiency of flux processing and increases the risk of user error impacting flux estimates.  An application program interface (API) was developed to help standardize and expedite processing EC data in Eddy Pro&reg;.  The API consists of two modules: the pre-processing module filters raw EC data using quality controls, generates descriptive statistics for the raw data, checks for changes in metadata (e.g., instrument separation), and groups EC data into periods common configurations for processing.  The processing module then runs EddyPro&reg; based on a user-defined configuration, which can be setup using the EddyPro GUI or by modifying one of the configuration files included with the API.  The processing is executed parallel batches, to minimize computation times.  Preliminary testing indicates the EddyPro API can speed up processing by 67% compared using the EddyPro GUI.  The API allows for automation of EC data processing while maintaining the ability to use the EddyPro GUI to define and inspect processing configurations.
+
+# Introduction
+
+Eddy Covariance (EC) is a method for measuring ecosystem-atmosphere fluxes of energy and trace gasses (e.g., CO_2).  Flux estimation via EC involves applying a Reynolds Operators to high frequency (>=10 Hz) measurements of 3-D winds and scalar concentrations over 30- to 60-minute intervals.  This is a computationally expensive procedure, and it can be particularly time consuming when repeated over months or years worth of EC data.
+
+One of the most popular applications for processing EC data is EddyPro&reg; @noauthor_eddypro_2021. The application is designed to provide easy, accurate EC flux computations @li-cor_inc_eddypro_2021.  It has a graphic user interface (GUI) that allows apply a standard processing pipeline or selectively apply more advanced filtering and correction procedures as needed.  The backend of the processing pipeline is executed in FORTRAN, and EddyPro outputs half-hourly or hourly flux estimates and other supplemental data as human-readable .csv files.
+
+While the EddyPro software application has made processing EC data more user friendly, it is still a tedious, and time consuming procedure.  The user is required to manually initiate runs in the GUI and whenever data need to be processed.  This can leave considerable room for errors and divergence of processing procedures between sites and time periods when processing is conducted by multiple or inexperienced users in a research group (e.g., graduate students).  
+
+Reprocessing is often required either to correct mistakes or test out different calculation and correction procedures. However, the GUI processes files sequentially and it can take days to execute when processing multiple years worth of data for a single site.  When applying computationally expensive (e.g., @ibrom_strong_2007; @fratini_relative_2012) which are sensitive to changes in site metadata to long periods of data, the GIU can be prone to crashing with cryptic error messages.
+
+
+Eddy Covariance data should be processed in batches over time-periods with similar conditions (e.g., seasons) and common configurations (e.g., instrument separation).  To allow sufficient data for spectral determining spectral corrections.  But when processing longer-time periods there substantial room for reduction of processing times via parallel computing.
+
+
+
+
+The EddyPro API (Application Program Interface) is a python wrapper for the EddyPro software package that allows for automation and parallel processing of flux estimation procedures.  Processing procedures can be configured using the EddyPro GUI or a text editor then dynamically implemented via the API to set the run period(s) and batch the data for processing in parallel.  
+
+# Methods
+
+The API consists of two parts: a pre-processing module, and the execution module.
+
+The pre-processing module can inspect the raw data prior to flux computation.  The pre-processing module checks the metadata where available (in .ghg files), detects and tracks changes to instrumentation, orientation, calibration coefficients.  The pre-processing can also be used to "overwrite" metadata, e.g., to correct for improperly measured sensor separation.  The pre-processing procedures help to identify periods for which fluxes should not be calculated (too much missing data) and define batching procedures to ensure consistent setup within processing batches.
+
+
+
+
+1. Read high frequency data in .ghg or text (.csv, .dat, etc.) format.
+
+* This will parse all data, month by month for the BB site in the highfreq folder using four cores to speed up processing time.
+
+* **If .ghg data** 
+    * Extract the data and read relevant sub-files
+    * Calculate raw half-hourly means of all input data
+    * Parse and track the metadata, inspecting for changes
+        * Update/correct metadata from a user-defined template as necessary
+
+* **If other .data files**
+
+2. Create metadata template files
+
+
+### Running Eddypro
+
+Create a .eddypro template, either using the GUI, editing one of the templates included here.  Then call EddyPro to run over a given time period - the API will handle updating the time period specific settings and partitioning the outputs by relevant period.  Where necessary, the API will separate cospectral inputs/outputs by accordingly.
+
+

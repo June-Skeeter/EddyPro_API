@@ -1,0 +1,14 @@
+[Instruments]
+instr_1_manufacturer='csi'
+instr_1_model='csat3_1'
+instr_1_sn=input('Serial no (optional): ')
+instr_1_sw_version=4.0
+instr_1_id='csat3_1'
+instr_1_height=input('Measurement height (m): ')
+instr_1_wformat='uvw'
+instr_1_wref='spar'
+instr_1_north_offset=input('North offset: (degrees): ')
+instr_1_head_corr=1
+instr_1_northward_separation=0.0
+instr_1_eastward_separation=0.0
+instr_1_vertical_separation=0.0

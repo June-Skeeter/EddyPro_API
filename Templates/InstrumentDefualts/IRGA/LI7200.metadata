@@ -1,0 +1,12 @@
+[Instruments]
+instr_*_manufacturer='licor'
+instr_*_model='li7200_1'
+instr_*_sn=input('Serial no (optional): ')
+instr_*_id='LI-7200'
+instr_*_sw_version=input('Software version no (optional): ')
+instr_*_tube_length=input('Tube length: (cm): ')
+instr_*_tube_diameter=input('Tube diameter (mm): ')
+instr_*_tube_flowrate=input('Flow rate (l/m): ')
+instr_*_northward_separation=input('Northward separation from sonic (cm)')
+instr_*_eastward_separation=input('Eastward separation from sonic (cm)')
+instr_*_vertical_separation=input('Vertical separation from sonic (cm)')
