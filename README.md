@@ -34,7 +34,20 @@ For now, the API will **only** work on windows.  There are plans to expand to ma
 
 1. [Install EddyPro](https://www.licor.com/env/support/EddyPro/software.html).  Make not of where the root installation of EddyPro ends up (e.g., C:/Program Files/LI-COR/EddyPro-7.0.9/) as you will need this later
 
-2. Create the virtual environment and install dependencies
+2. Clone the repository
+
+```{bash}
+git clone --recurse-submodules https://github.com/CANFLUX/EddyPro_API
+```
+
+3. Run the installation routine 
+
+```{bash}
+cd Path\To\eddyProAPI
+python pyDbTools\setupPyVenv\install.py
+```
+
+<!-- 2. Create the virtual environment and install dependencies
 
 * If you're using VSCode, it should autodetect the requirements.txt dependency list.  Open the EddyPro_API folder in VSCode.   Then hit ctrl+shift+p > type "Python" and select "Create Environment" then select requirements.txt when prompted.
 
@@ -59,7 +72,7 @@ For now, the API will **only** work on windows.  There are plans to expand to ma
 3. Make a copy of **config_files/user_path_definitions_template.yml** and name it **config_files\user_path_definitions.yml** then update the paths accordingly.
 
 * The API needs to be pointed to you base installation of EddyPro.  Make sure you are running v7.0.9
-* The API also needs you to define a working directory where outputs should be saved. If you were to set `workingDir: C:/highfreq/` then you would end up with outputs stored in  C:/highfreq/siteID/metadata and C:/highfreq/siteID/eddyProAPIOutputs
+* The API also needs you to define a working directory where outputs should be saved. If you were to set `workingDir: C:/highfreq/` then you would end up with outputs stored in  C:/highfreq/siteID/metadata and C:/highfreq/siteID/eddyProAPIOutputs -->
 
 # Running the API
 
@@ -76,11 +89,7 @@ The API can be called via command line; instructions are given below.  You can a
 
     `.\.venv\Scripts\activate`
 
-    b. Call the program.  In this example, the program will execute for the current year, on the BB site, using Templates/ClosedPathStandard.eddypro to define the processing procedures.  Since biometUser was set to true the API will auto generate csv files containing biomet (e.g., TA, PAR, etc.) and dynamic metadata (e.g., canopy height) before running and will dump results form the "full_output" files to the Biomet.Net database format.
+    b. Call the program.  In this example, the program will execute for the current year, on the "BB" site, using Templates/ClosedPathStandard.eddypro to define the processing procedures.
 
-    `py eddyProAPI.py --siteID BB --biometUser True --eddyProStaticConfig Templates/ClosedPathStandard.eddypro`
+    `py eddyProAPI.py --siteID BB --eddyProStaticConfig Templates/ClosedPathStandard.eddypro`
     
-
-#### Example Call
-
-`python eddyProAPI.py --siteID BB --biometUser True --sourceDir C:/highfreq/BB/raw/ --metaDataUpdates C:/highfreq/BB/Manual_Metadata_Updates.csv --eddyProStaticConfig Templates/ClosedPathStandard.eddypro --dateRange 2023-06-01 2024-01-02 --runMode 2 --reset True `
