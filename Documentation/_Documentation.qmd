@@ -2,7 +2,7 @@
 title: "An Application Program Interface for Automating and Streamlining Flux Processing in EddyPro&reg;"
 author: Dr. June Skeeter
 bibliography: EddyProAPI.bib
-format: docx
+format: html
 ---
 
 # Abstract
@@ -56,3 +56,7 @@ The pre-processing module can inspect the raw data prior to flux computation.  T
 Create a .eddypro template, either using the GUI, editing one of the templates included here.  Then call EddyPro to run over a given time period - the API will handle updating the time period specific settings and partitioning the outputs by relevant period.  Where necessary, the API will separate cospectral inputs/outputs by accordingly.
 
 
+### References
+
+::: {#refs}
+:::

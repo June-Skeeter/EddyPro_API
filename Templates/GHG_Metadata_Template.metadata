@@ -2,8 +2,8 @@
 [Project]
 title='GHG_Metadata_Template'
 id='GHG_Metadata_Template'
-creation_date=pd.to_datetime(datetime.now()).floor('s')
-last_change_date=pd.to_datetime(datetime.now()).floor('s')
+creation_date=datetime.now().strftime('%%Y%%m%%d%%H%%M')
+last_change_date=datetime.now().strftime('%%Y%%m%%d%%H%%M')
 start_date=
 end_date=
 file_name="{self.siteID}_GHG_Metadata.metadata"
@@ -17,15 +17,15 @@ timestamp=
 iso_format=
 end_of_line=
 enable_processing=
-tstamp_end=
+tstamp_end=input('File timestamp represents the end minute of interval: (0=No / 1=Yes)')
 
 [Site]
 site_name=self.siteID
 site_id=self.siteID
-altitude=self.altitude
-latitude=self.latitude
-longitude=self.longitude
-canopy_height=self.canopy_height
+altitude=input('Station altitude (m.a.s.l): ')
+latitude=input('Station latitude (decimal degrees): ')
+longitude=input('Station longitude (decimal degrees): ')
+canopy_height=input('Mean canopy height (m): ')
 displacement_height=
 roughness_length=
 
@@ -34,8 +34,8 @@ station_name=self.siteID
 station_id=self.siteID
 
 [Timing]
-acquisition_frequency=
-file_duration=
+acquisition_frequency=input('Sampling acquisition_frequency (Hz): ')
+file_duration=input('Measurement interval (min): ')
 pc_time_settings=
 
 [Instruments]
@@ -60,10 +60,10 @@ instr_*_kw=
 instr_*_ko=
 
 [FileDescription]
-separator=
-header_rows=
-data_label=Not set
-col_*_variable=
+separator=[key for key, value in self.config['delimiters'].items() if value == ','][0]
+header_rows=len(self.config[self.fileType]['fileDescription']['skiprows']+self.config[self.fileType]['fileDescription']['header'])
+data_label='Not set'
+col_*_variable=ignore,u,v,w
 col_*_instrument=
 col_*_measure_type=
 col_*_unit_in=

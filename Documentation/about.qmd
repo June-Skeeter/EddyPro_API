@@ -1,0 +1,167 @@
+---
+title: "An Application Program Interface for Automating and Parallelizing EddyPro&reg;"
+author:
+    - name: Dr. June Skeeter
+      affiliations:
+        - name: Natural Resources Canada
+format: 
+    revealjs:
+        theme: default
+        scrollable: true
+        controls: true
+        navigation-mode: linear
+        controls-layout: bottom-right
+        controls-tutorial: true
+        slide-number: true
+        show-slide-number: all
+        pdfMaxPagesPerSlide: 1
+        footer: <a href="https://github.com/CANFLUX/EddyPro_API">See the repo here</a>
+bibliography: EddyProAPI.bib
+---
+
+
+## About EddyPro&reg;
+
+
+@noauthor_eddypro_2021 is one of the most popular applications for processing Eddy Covariance (EC) data.
+
+* It designed to provide easy, accurate EC flux computations @li-cor_inc_eddypro_2021.
+* Open source software with a graphic user interface (GUI)
+    * Interfaces with a processing pipeline is executed in FORTRAN
+    * Based on the @noauthor_eco2s_2011 package
+
+## Who Uses EddyPro?
+
+```{python}
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+pth = 'survey/FLUXNET-CH4-Form-Responses.csv'
+df=pd.read_csv(pth)
+df = df.fillna('Not Specified')
+g = 'What software do you use to process your high frequency (e.g., 10-20 Hz) flux data (examples could include: EddyPro, Eddy4R, in-house software, etc.)'
+df[g]=df[g].replace({"I actually have no experience working with high frequency flux data, but I'm ready to learn about it.":'New User, No Preference Yet',
+                     "I am new to it":'New User, No Preference Yet',
+                     'EddyPro, Rstudio':'EddyPro + In-house',
+                     'EddyPro, in-house':'EddyPro + In-house',
+                     'EddyPro; in-house software':'EddyPro + In-house',
+                     'in-house Matlab':'In-house',
+                     'in-house software':'In-house',
+                     'R':'In-house',
+                     'Python':'In-house',
+                     'Matlab':'In-house',
+                     'aucun':'Not Specified'
+                     })
+df = df.loc[df[g]!='Not Specified']
+summary = df.groupby(g).count()
+
+
+plt.barh(summary['Timestamp'].sort_values().index,
+summary['Timestamp'].sort_values())
+plt.title('What software do you use to process your high frequency flux data? (Survey responses)')
+N = df.shape[0]
+EP_N = df.loc[df[g].str.contains('EddyPro')].shape[0]
+pct = EP_N/N
+```
+
+`{python} EP_N` of the `{python} N` respondents who answered the question, indicated that they use EddyPro&reg;.
+
+## Advantages of EddyPro&reg;
+
+
+The GUI makes flux processing accessible.
+
+* Point and click processing without need for coding
+* Users can see the wide range of methods options available
+    * Links to comprehensive documentation
+* Works great for processing a single season of EC data
+
+## Disadvantages of EddyPro&reg;
+
+Point and click processing becomes a bottle.
+
+* New runs must be initiated each time more data comes in
+    + Ample room for error when conducted by inexperienced users (e.g., research assistants)
+    + Leads to delays in processing
+* Long records take a long time to process, users may avoid:
+    + Testing alternate methods 
+    + Flux recalculation
+
+
+## How the API Can Help?
+
+The Application Program Interface (API) can be used to automate and parallelize flux processing. 
+
+* Call the API from command line, a python script, or run in a Jupyter Notebook
+    * Schedule runs at regular intervals as new data come in
+    * Setup multiple runs to compare processing methods
+* API will process longer in parallel to expedite processing
+    * Can reduce processing time by a quarter or more
+
+
+## How the API Can Help?
+
+The Application Program Interface (API) can be help standardize flux processing. 
+
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+* Template .eddypro files serve as the basis for a project
+    * View/modify options using the GUI or a text editor
+* Works with LICOR (GHG) or Cambpbell (TOA5) files
+
+:::
+
+::: {.column width="50%"}
+
+![Allows for quick differentiation](images/Compare.png)
+
+:::
+::::
+
+## How does it work?
+
+There are two main routines in the API which will be run in sequence when calling the script.
+
+```{bash}
+cd Path\To\eddyProAPI
+.\.venv\Scripts\activate
+python .\eddyProAPI.py --siteID ID --fileType ghg --dateRange 2024-06-01 2024-08-31
+```
+
+## Pre-processing
+
+* Inspect for changes in metadata
+    * Identify groups of common configuration
+* Parses the high frequency data to generate descriptive statistics
+    * Optional pre-filtering to exclude bad data
+* Generate biomet and dynamic metadata files on-the-fly
+    * Reads Biomet.Net database files
+    
+## Processing
+
+* Runs EddyPro&reg; over the desired time period
+    * Use a template .eddypro file to ensure standardized processing
+    * Appended run-specific information (inputs, directories, etc.)
+* Executes raw Data processing in parallel
+* Flux processing and correction applied on a per-group basis
+* Dump outputs to Biomet.Net database files
+
+## What's next?
+
+This project is still under development.
+
+* Comprehensive documentation page will be available in the coming weeks
+    * Basic usage instructions can be found on the [repo page](https://github.com/CANFLUX/EddyPro_API)
+
+* I am looking for interested users to help with Beta testing!
+    * Please reach out if you would like to try it out: june.skeeter@nrcan-rncan.gc.ca
+
+
+
+## References
+
+::: {#refs}
+:::

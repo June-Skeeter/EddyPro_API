@@ -1,6 +1,5 @@
 ---
-title: "An Application Program Interface for Automating and Streamlining Flux Processing in EddyPro&reg;"
-author: Dr. June Skeeter
-bibliography: EddyProAPI.bib
-format: html
+title: "EddyPro API"
 ---
+
+Find more info [here](Documentation/about.qmd)
