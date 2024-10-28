@@ -6,7 +6,6 @@ GHG:
   format: '%Y-%m-%dT%H%M%S'
   ep_date_pattern: yyyy-mm-ddTHHMM??
 
-
 TOA5:
   extension: 'dat'
   tstamp_end: False

@@ -48,6 +48,14 @@ cd Path\To\eddyProAPI
 python pyDbTools\setupPyVenv\install.py
 ```
 
+* This routine will walk you through a series of prompts to define important path variables.  You must define:
+    + The base path to your EddyPro Installation
+    + A path to your database folder (if desired for dynamically reading biomet data)
+    + A path to the root folder containing your raw high frequency data
+* The script will then create a python virtual environment (.venv) and install all required packages.
+    + A .venv allows you to install packages while keeping them isolated from your base Python installation to avoid potential dependency issues that could arise from conflicting version of packages.
+
+
 <!-- 2. Create the virtual environment and install dependencies
 
 * If you're using VSCode, it should autodetect the requirements.txt dependency list.  Open the EddyPro_API folder in VSCode.   Then hit ctrl+shift+p > type "Python" and select "Create Environment" then select requirements.txt when prompted.
