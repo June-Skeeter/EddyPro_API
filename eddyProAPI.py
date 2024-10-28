@@ -12,6 +12,7 @@ import fnmatch
 import argparse
 from glob import glob
 import batchProcessing
+import pyDbTools.readBinary as readBinary
 import importlib
 import numpy as np
 import pandas as pd
@@ -21,14 +22,8 @@ from functools import partial
 from collections import Counter, defaultdict
 from multiprocessing import Pool
 from datetime import datetime,date
-from HelperFunctions import progressbar, queryBiometDatabase,dumpToBiometDatabase
+from HelperFunctions import progressbar,dumpToBiometDatabase
 importlib.reload(batchProcessing)
-
-# Directory of current script
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-# Set to cwd to location of the current script
-os.chdir(dname)
 
 # Default arguments
 defaultArgs = {
@@ -60,7 +55,11 @@ defaultArgs = {
 
 class eddyProAPI():
     def __init__(self,**kwargs):
-        os.chdir(dname)
+        # Directory of current script
+        abspath = os.path.abspath(__file__)
+        self.dname = os.path.dirname(abspath)
+        # Set to cwd to location of the current script
+        os.chdir(self.dname)
         if isinstance(kwargs, dict):
             pass
         elif os.path.isdir(kwargs):
@@ -140,14 +139,16 @@ class eddyProAPI():
         os.makedirs(self.config['Paths']['outputDir'],exist_ok=True)
         # On the fly Biomet and dynamicMetadata csv file generation
         # For Biomet.net users only
-        if self.biometUser and os.path.isdir(self.config['relDir']['Database']):
+        if self.biometUser and os.path.isdir(self.config['rootDir']['Database']):
             print('Biomet user: Querying database for up-to-date biomet data')
-            auxilaryDpaths=queryBiometDatabase(
-                siteID=self.siteID,
-                outputPath = self.config['Paths']['metaDir'],
-                database = self.config['relDir']['Database'],
-                dateRange = self.dateRange)
-            for key,value in auxilaryDpaths.items():
+            requests = os.path.abspath(self.dname+'/config_files/BiometDataFileTemplate.yml')
+            out = readBinary.fromDatabase(siteID = self.siteID,
+                                outputPath = self.config['Paths']['metaDir'],
+                                database = self.config['rootDir']['Database'],
+                                dateRange = self.dateRange,
+                                requests = requests,
+                                saveDf = True)
+            for key,value in out.results.items():
                 setattr(self, key, value)
 
         self.eddyProGroupDefsTemplate={'Project':{}} 
@@ -613,7 +614,7 @@ class eddyProAPI():
         print(f"runEP complete, time elapsed {np.round(time.time()-mainTime,3)} seconds")
 
     def setupGroups(self):
-        self.tempDir = os.path.abspath(dname+'/temp/')
+        self.tempDir = os.path.abspath(self.dname+'/temp/')
         if self.debug == False and os.path.isdir(self.tempDir):
             shutil.rmtree(self.tempDir)
             os.mkdir(self.tempDir)
@@ -786,13 +787,13 @@ class eddyProAPI():
             os.makedirs(d_out)
         batchProcessing.pasteWithSubprocess(d_in,d_out,option='xcopy')
         shutil.rmtree(d_in)
-        if self.biometUser and os.path.isdir(self.config['relDir']['Database']):
+        if self.biometUser and os.path.isdir(self.config['rootDir']['Database']):
             for outFile,metaData in self.config['fccFinalOutputs'].items():
                 toDump = fnmatch.filter(os.listdir(d_out),f'*{outFile}*')
                 for td in toDump:
                     print(td)
                     dumpToBiometDatabase(siteID=self.siteID,
-                                        database = self.config['relDir']['Database'],
+                                        database = self.config['rootDir']['Database'],
                                         inputFile=f"{d_out}/{td}",
                                         metaData=metaData,
                                         stage='epOutputs',
